@@ -215,7 +215,10 @@ class ImageGenerator:
                     return match
             return None
         
-        current_list_number = {}  # 用于跟踪每个缩进级别的编号
+        # 用于跟踪每个缩进级别的编号
+        current_list_number = {}
+        # 用于跟踪每个缩进级别的起始值
+        list_start_numbers = {}
         
         for line in lines:
             if not line.strip():
@@ -227,24 +230,27 @@ class ImageGenerator:
             
             # 根据缩进调整列表堆栈
             while list_stack and list_stack[-1]['indent'] >= indent_level:
-                list_stack.pop()
-                if list_stack and 'counter' in list_stack[-1]:
-                    current_list_number[list_stack[-1]['indent']] = list_stack[-1]['counter']
+                popped = list_stack.pop()
+                # 当退出一个缩进级别时，清除该级别的编号记录
+                if popped['indent'] in current_list_number:
+                    del current_list_number[popped['indent']]
             
             # 检查是否是有序列表
             ordered_match = is_ordered_list(stripped_line)
             if ordered_match:
                 marker, content = ordered_match.groups()
                 
-                # 确定这个缩进别的起始编号
+                # 如果是新的缩进级别或新的列表开始
                 if indent_level not in current_list_number:
-                    # 如果是字母，将其转换为数字
+                    # 保存起始值
                     if marker.isalpha():
                         start_num = ord(marker.lower()) - ord('a') + 1
                     else:
                         start_num = int(marker)
                     current_list_number[indent_level] = start_num
+                    list_start_numbers[indent_level] = start_num
                 else:
+                    # 使用已存在的编号
                     current_list_number[indent_level] += 1
                 
                 list_stack.append({
@@ -282,7 +288,8 @@ class ImageGenerator:
                 if not line.strip():
                     list_stack = []
                     current_list_number = {}
-        
+                    list_start_numbers = {}
+            
         return '\n'.join(processed_lines)
     
     def get_wrapped_text(self, text, font, max_width):
@@ -291,19 +298,6 @@ class ImageGenerator:
         # 处理列表格式
         processed_text = self.process_list_text(text)
         paragraphs = processed_text.split('\n')
-        
-        # 计算列表标记的最大宽度
-        max_marker_width = 0
-        for paragraph in paragraphs:
-            if not paragraph.strip():
-                continue
-            # 检查是否是列表项并获取标记部分
-            list_match = re.match(r'^(\s*)((\d+[.、)]|[a-z][.、)]|\s*[-•*])\s+)(.+)$', paragraph)
-            if list_match:
-                indent = list_match.group(1)
-                marker = list_match.group(2)
-                marker_width = font.getlength(indent + marker)
-                max_marker_width = max(max_marker_width, marker_width)
         
         for paragraph in paragraphs:
             if not paragraph:
@@ -319,52 +313,69 @@ class ImageGenerator:
                 marker = list_match.group(2)
                 content = list_match.group(4)
                 
-                # 计算内容的起始位置（统一缩进）
-                content_start = max_marker_width + self.list_indent
+                # 计算缩进和标记的宽度
+                indent_marker_width = font.getlength(indent + marker)
                 
-                # 计算实际可用宽度
-                available_width = max_width - content_start
+                # 计算第一行可用宽度（减去缩进和标记的宽度）
+                first_line_width = max_width - indent_marker_width
                 
-                # 处理第一行（包含标记）
-                first_line = indent + marker + content
+                # 处理第一行
+                current_line = indent + marker
+                current_width = indent_marker_width
+                words = list(content)  # 按字符分割内容
                 
-                # 确保第一行不会太长
-                while font.getlength(first_line) > max_width and len(content) > 1:
-                    content = content[:-1]
-                    first_line = indent + marker + content
+                # 处理第一行剩余内容
+                i = 0
+                while i < len(words):
+                    char_width = font.getlength(words[i])
+                    if current_width + char_width <= max_width:
+                        current_line += words[i]
+                        current_width += char_width
+                        i += 1
+                    else:
+                        break
                 
-                lines.append(first_line)
+                lines.append(current_line)
                 
-                # 处理剩余内容
-                remaining_content = content[len(content):]
-                if remaining_content:
-                    # 创建后续行的缩进
-                    subsequent_indent = ' ' * int(content_start / font.getlength(' '))
+                # 处理后续行
+                if i < len(words):
+                    remaining_content = ''.join(words[i:])
+                    # 计算后续行的缩进宽度（与第一行标记对齐）
+                    subsequent_indent = ' ' * (len(indent) + len(marker))
+                    subsequent_indent_width = font.getlength(subsequent_indent)
                     
-                    while remaining_content:
-                        # 计算这一行可以容纳多少字符
-                        line = subsequent_indent
-                        for char in remaining_content:
-                            test_line = line + char
-                            if font.getlength(test_line) > max_width:
-                                break
-                            line = test_line
-                        
-                        lines.append(line)
-                        remaining_content = remaining_content[len(line)-len(subsequent_indent):]
+                    current_line = subsequent_indent
+                    current_width = subsequent_indent_width
+                    
+                    for char in remaining_content:
+                        char_width = font.getlength(char)
+                        if current_width + char_width <= max_width:
+                            current_line += char
+                            current_width += char_width
+                        else:
+                            lines.append(current_line)
+                            current_line = subsequent_indent + char
+                            current_width = subsequent_indent_width + char_width
+                    
+                    if current_line != subsequent_indent:
+                        lines.append(current_line)
             else:
-                # 处理非列表项文本
-                current_text = paragraph
-                while current_text:
-                    line = ''
-                    for char in current_text:
-                        test_line = line + char
-                        if font.getlength(test_line) > max_width:
-                            break
-                        line = test_line
-                    
-                    lines.append(line)
-                    current_text = current_text[len(line):]
+                # 处理普通段落
+                current_line = ''
+                current_width = 0
+                
+                for char in paragraph:
+                    char_width = font.getlength(char)
+                    if current_width + char_width <= max_width:
+                        current_line += char
+                        current_width += char_width
+                    else:
+                        lines.append(current_line)
+                        current_line = char
+                        current_width = char_width
+                
+                if current_line:
+                    lines.append(current_line)
         
         return lines
     
