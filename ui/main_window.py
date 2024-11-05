@@ -78,61 +78,91 @@ class MainWindow(QMainWindow):
         left_layout.addWidget(button_container)  # 添加按钮容器
         
         # 右侧预览面板
-        right_scroll = QScrollArea()
-        right_scroll.setWidgetResizable(True)
-        right_content = QWidget()
-        right_layout = QVBoxLayout(right_content)
-        right_layout.setSpacing(0)  # 将垂直间距设为0
-        right_layout.setContentsMargins(0, 0, 0, 0)  # 移除所有边距
+        right_panel = QWidget()
+        right_layout = QHBoxLayout(right_panel)  # 水平布局
+        right_layout.setSpacing(0)
+        right_layout.setContentsMargins(0, 0, 0, 0)
         
-        # 创建一个水平布局的容器来包含预览图片和导航按钮
-        preview_container = QWidget()
-        preview_container_layout = QHBoxLayout(preview_container)
-        preview_container_layout.setSpacing(10)  # 设置按钮和预览图片之间的间距
-        preview_container_layout.setContentsMargins(10, 10, 10, 10)
+        # 创建导航按钮容器
+        nav_container = QWidget()
+        nav_container.setFixedWidth(60)  # 设置固定宽度
+        nav_layout = QVBoxLayout(nav_container)
+        nav_layout.setContentsMargins(10, 0, 10, 0)
         
         # 创建并设置导航按钮
         self.prev_button = QPushButton()
-        self.prev_button.setFixedSize(40, 40)  # 调整按钮大小为正方形
-        self.prev_button.setIcon(QIcon("resources/icons/left-arrow.png"))  # 设置左箭头图标
-        self.prev_button.setIconSize(QSize(24, 24))  # 设置图标大小
+        self.prev_button.setFixedSize(40, 40)
+        self.prev_button.setIcon(QIcon("resources/icons/left-arrow.png"))
+        self.prev_button.setIconSize(QSize(24, 24))
         self.prev_button.clicked.connect(self.show_previous_image)
-        self.prev_button.setEnabled(False)  # 初始状态禁用
-        self.prev_button.setToolTip("上一页")  # 添加悬停提示
+        self.prev_button.setEnabled(False)
+        self.prev_button.setToolTip("上一页")
         
         self.next_button = QPushButton()
-        self.next_button.setFixedSize(40, 40)  # 调整按钮大小为正方形
-        self.next_button.setIcon(QIcon("resources/icons/right-arrow.png"))  # 设置右箭头图标
-        self.next_button.setIconSize(QSize(24, 24))  # 设置图标大小
+        self.next_button.setFixedSize(40, 40)
+        self.next_button.setIcon(QIcon("resources/icons/right-arrow.png"))
+        self.next_button.setIconSize(QSize(24, 24))
         self.next_button.clicked.connect(self.show_next_image)
-        self.next_button.setEnabled(False)  # 初始状态禁用
-        self.next_button.setToolTip("下一页")  # 添加悬停提示
+        self.next_button.setEnabled(False)
+        self.next_button.setToolTip("下一页")
+        
+        # 将按钮添加到导航容器，并添加弹性空间使按钮垂直居中
+        nav_layout.addStretch(1)
+        nav_layout.addWidget(self.prev_button)
+        nav_layout.addSpacing(20)  # 按钮之间的间距
+        nav_layout.addWidget(self.next_button)
+        nav_layout.addStretch(1)
+        
+        # 创建预览内容容器
+        preview_content = QWidget()
+        preview_layout = QVBoxLayout(preview_content)
+        preview_layout.setContentsMargins(20, 20, 20, 20)  # 设置边距
+        preview_layout.setSpacing(0)
+        preview_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        
+        # 创建滚动区域
+        self.right_scroll = QScrollArea()
+        self.right_scroll.setWidgetResizable(True)
+        self.right_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.right_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        self.right_scroll.setAlignment(Qt.AlignmentFlag.AlignCenter)  # 设置滚动区域内容居中
+        
+        # 创建预览内容的容器
+        preview_widget = QWidget()
+        preview_widget_layout = QVBoxLayout(preview_widget)
+        preview_widget_layout.setContentsMargins(20, 20, 20, 20)  # 设置边距
+        preview_widget_layout.setSpacing(0)
+        preview_widget_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
         
         # 预览标签
         self.preview_label = QLabel()
         self.preview_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.preview_label.setSizePolicy(
+            QSizePolicy.Policy.Expanding,
+            QSizePolicy.Policy.Expanding
+        )
+        self.preview_label.setMinimumSize(400, 533)  # 设置最小尺寸，保持3:4比例
         
-        # 将组件添加到水平布局中
-        preview_container_layout.addWidget(self.prev_button)
-        preview_container_layout.addWidget(self.preview_label, 1)  # 预览图片占据更多空间
-        preview_container_layout.addWidget(self.next_button)
+        # 将预览标签添加到预览内容容器
+        preview_widget_layout.addWidget(self.preview_label)
         
-        # 将预览容器添加到主布局
-        right_layout.addWidget(preview_container, 1)  # 添加拉伸因子使其填充可用空间
+        # 将预览内容容器设置为滚动区域的widget
+        self.right_scroll.setWidget(preview_widget)
         
-        right_scroll.setWidget(right_content)
+        # 将滚动区域添加到预览内容布局
+        preview_layout.addWidget(self.right_scroll)
+        
+        # 将导航容器和预览内容添加到右侧面板布局
+        right_layout.addWidget(nav_container)
+        right_layout.addWidget(preview_content, 1)  # 添加拉伸因子使预览内容填充剩余空间
+        
+        # 设置右侧预览区域的宽度范围
+        right_panel.setMinimumWidth(800)
+        right_panel.setMaximumWidth(1200)
         
         # 设置布局比例
         main_layout.addWidget(left_panel, 60)
-        main_layout.addWidget(right_scroll, 40)
-        
-        # 设置右侧预览区域的宽度范围
-        right_scroll.setMinimumWidth(800)
-        right_scroll.setMaximumWidth(1200)
-        
-        # 添加响应式布局支持
-        self.right_content = right_content
-        self.right_scroll = right_scroll
+        main_layout.addWidget(right_panel, 40)
         
         # 连接信号
         self.generate_button.clicked.connect(self.generate_image)
@@ -210,13 +240,20 @@ class MainWindow(QMainWindow):
         temp_path = 'temp_preview.png'
         self.current_images[self.current_image_index].save(temp_path)
         
-        # 显示预览
+        # 加载图片
         pixmap = QPixmap(temp_path)
+        
+        # 获取预览标签的大小
+        label_size = self.preview_label.size()
+        
+        # 缩放图片以填充预览标签，保持宽高比
         scaled_pixmap = pixmap.scaled(
-            self.preview_label.size(),
+            label_size,
             Qt.AspectRatioMode.KeepAspectRatio,
             Qt.TransformationMode.SmoothTransformation
         )
+        
+        # 显示图片
         self.preview_label.setPixmap(scaled_pixmap)
         
         # 清理临时文件
@@ -292,17 +329,21 @@ class MainWindow(QMainWindow):
     def update_preview_size(self):
         """更新预览图片大小"""
         # 获取预览容器的可见大小
-        available_width = min(self.right_scroll.width() - 10, 1000)  # 减少边距
-        available_height = self.right_scroll.height() - 50  # 为控制按钮预留空间
+        available_width = self.right_scroll.viewport().width() - 40  # 减去左右边距
+        available_height = self.right_scroll.viewport().height() - 40  # 减去上下边距
         
         # 计算保持宽高比的最大尺寸
         image_ratio = 3/4  # 图片的宽高比
-        if available_width * image_ratio <= available_height:
-            preview_width = available_width
-            preview_height = available_width * image_ratio
-        else:
+        container_ratio = available_width / available_height
+        
+        if container_ratio > image_ratio:
+            # 如果容器更宽，以高度为基准
             preview_height = available_height
-            preview_width = available_height / image_ratio
+            preview_width = preview_height / image_ratio
+        else:
+            # 如果容器更高，以宽度为基准
+            preview_width = available_width
+            preview_height = preview_width * image_ratio
         
         # 更新预览标签的固定大小
         self.preview_label.setFixedSize(QSize(int(preview_width), int(preview_height)))
