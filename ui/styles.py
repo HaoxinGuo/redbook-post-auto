@@ -53,7 +53,7 @@ class FusionStyle:
             
             QPushButton:disabled {
                 background-color: #F5F5F5;
-                color: #00000040;
+                color: #2A2A2A;
                 border-color: #D9D9D9;
             }
             

@@ -236,7 +236,7 @@ class ImageGenerator:
             if ordered_match:
                 marker, content = ordered_match.groups()
                 
-                # 确定这个缩进��别的起始编号
+                # 确定这个缩进别的起始编号
                 if indent_level not in current_list_number:
                     # 如果是字母，将其转换为数字
                     if marker.isalpha():

@@ -55,13 +55,27 @@ class MainWindow(QMainWindow):
         # 样式面板
         self.style_panel = StylePanel()
         
+        # 创建按钮容器
+        button_container = QWidget()
+        button_layout = QHBoxLayout(button_container)
+        
         # 生成按钮
         self.generate_button = QPushButton("生成图片")
+        self.generate_button.setObjectName("primaryButton")
         
-        # 添加所有组件到左侧布局
+        # 下载按钮
+        self.download_button = QPushButton("下载所有图片")
+        self.download_button.setEnabled(False)
+        self.download_button.setObjectName("primaryButton")
+        self.download_button.clicked.connect(self.download_images)
+        
+        # 添加按钮到布局
+        button_layout.addWidget(self.generate_button)
+        button_layout.addWidget(self.download_button)
+        
         left_layout.addWidget(tabs)
         left_layout.addWidget(self.style_panel)
-        left_layout.addWidget(self.generate_button)
+        left_layout.addWidget(button_container)  # 添加按钮容器
         
         # 右侧预览面板
         right_scroll = QScrollArea()
@@ -86,17 +100,11 @@ class MainWindow(QMainWindow):
         self.preview_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         right_layout.addWidget(self.preview_label)
         
-        # 下载按钮
-        self.download_button = QPushButton("下载所有图片")
-        self.download_button.setEnabled(False)
-        self.download_button.clicked.connect(self.download_images)
-        right_layout.addWidget(self.download_button)
-        
         right_scroll.setWidget(right_content)
         
         # 设置布局比例
-        main_layout.addWidget(left_panel, 60)
-        main_layout.addWidget(right_scroll, 40)
+        main_layout.addWidget(left_panel, 50)  # 左侧占50%
+        main_layout.addWidget(right_scroll, 50)  # 右侧占50%
         
         # 设置右侧预览区域的最小和最大宽度
         right_scroll.setMinimumWidth(400)
@@ -119,7 +127,7 @@ class MainWindow(QMainWindow):
         self.generate_button.clicked.connect(self.generate_image)
         self.style_panel.style_changed.connect(self.preview_style_change)
         
-        # 设置生成按钮为主要按钮样式
+        # 设置按钮样式
         self.generate_button.setObjectName("primaryButton")
         self.download_button.setObjectName("primaryButton")
     
@@ -152,6 +160,8 @@ class MainWindow(QMainWindow):
             
             # 启用下载按钮
             self.download_button.setEnabled(True)
+            
+            print(f"生成了 {len(self.current_images)} 张图片")
             
         except Exception as e:
             print(f"生成图片错误: {str(e)}")
@@ -203,6 +213,7 @@ class MainWindow(QMainWindow):
     def download_images(self):
         """下载所有图片"""
         if not self.current_images:
+            print("没有可下载的图片")
             return
             
         try:
@@ -220,9 +231,15 @@ class MainWindow(QMainWindow):
                 
                 # 保存所有图片
                 for i, image in enumerate(self.current_images):
-                    filename = f"小红书图片_{timestamp}_第{i+1}页.png"
+                    filename = f"小红书图片_{timestamp}_第{i + 1}页.png"
                     filepath = os.path.join(directory, filename)
+                    
+                    # 保存图片
                     image.save(filepath, 'PNG')
+                    
+                print(f"所有图片已保存到: {directory}")
+            else:
+                print("未选择保存目录")
                 
         except Exception as e:
             print(f"保存图片错误: {str(e)}")
@@ -244,8 +261,8 @@ class MainWindow(QMainWindow):
     def update_preview_size(self):
         """更新预览图片大小"""
         # 获取滚动区域的可见大小
-        available_width = min(self.right_scroll.width() - 40, 560)  # 限制最大宽度
-        available_height = self.right_scroll.height() - 100  # 留出按钮和控件的空间
+        available_width = min(self.right_scroll.width() ,1000)  # 限制最大宽度
+        available_height = self.right_scroll.height()   # 留出按钮和控件的空间
         
         # 计算保持宽高比的最大尺寸
         image_ratio = 3/4  # 图片的宽高比
