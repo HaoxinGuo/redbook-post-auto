@@ -12,28 +12,71 @@ class TextBlock(QWidget):
     def init_ui(self):
         layout = QHBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(10)  # 增加组件之间的间距
 
         # 类型选择
         self.type_combo = QComboBox()
         self.type_combo.addItems(["标题", "内容"])
+        self.type_combo.setMinimumWidth(80)  # 设置最小宽度
+        self.type_combo.currentTextChanged.connect(self.on_type_changed)
         layout.addWidget(self.type_combo)
 
         # 文本编辑框
         self.editor = QTextEdit()
-        self.editor.setMinimumHeight(50)
-        self.editor.setMaximumHeight(100)
+        self.editor.setMinimumHeight(100)  # 增加最小高度
+        self.editor.setMaximumHeight(300)  # 增加最大高度
+        # 设置文本编辑框的样式
+        self.editor.setStyleSheet("""
+            QTextEdit {
+                padding: 10px;
+                line-height: 1.5;
+                font-size: 14px;
+            }
+        """)
         layout.addWidget(self.editor)
 
         # 按钮容器
         button_layout = QVBoxLayout()
+        button_layout.setSpacing(5)
         
         # 删除按钮
         delete_button = QPushButton("×")
         delete_button.setMaximumWidth(30)
+        delete_button.setMinimumHeight(30)
         delete_button.clicked.connect(lambda: self.deleted.emit(self))
         button_layout.addWidget(delete_button)
+        button_layout.addStretch()  # 添加弹性空间
         
         layout.addLayout(button_layout)
+        
+        # 初始设置高度
+        self.on_type_changed(self.type_combo.currentText())
+
+    def on_type_changed(self, text):
+        """根据类型调整编辑框高度"""
+        if text == "标题":
+            self.editor.setMinimumHeight(80)
+            self.editor.setMaximumHeight(150)
+            # 设置标题的字体大小
+            self.editor.setStyleSheet("""
+                QTextEdit {
+                    padding: 10px;
+                    line-height: 1.5;
+                    font-size: 16px;
+                    font-weight: bold;
+                }
+            """)
+        else:
+            self.editor.setMinimumHeight(150)
+            self.editor.setMaximumHeight(400)
+            # 设置内容的字体大小
+            self.editor.setStyleSheet("""
+                QTextEdit {
+                    padding: 10px;
+                    line-height: 1.5;
+                    font-size: 14px;
+                }
+            """)
 
     def get_content(self):
         return {
@@ -55,11 +98,21 @@ class TextEditor(QWidget):
 
     def init_ui(self):
         self.layout = QVBoxLayout(self)
+        self.layout.setSpacing(15)  # 增加文本块之间的间距
+        self.layout.setContentsMargins(10, 10, 10, 10)  # 设置边距
+        
+        # 添加按钮容器
+        button_container = QWidget()
+        button_layout = QHBoxLayout(button_container)
+        button_layout.setContentsMargins(0, 0, 0, 0)
         
         # 添加按钮
         add_button = QPushButton("添加文本块")
+        add_button.setMinimumHeight(40)  # 增加按钮高度
         add_button.clicked.connect(self.add_text_block)
-        self.layout.addWidget(add_button)
+        button_layout.addWidget(add_button)
+        
+        self.layout.addWidget(button_container)
 
         # 添加一个默认的文本块
         self.add_text_block()
@@ -106,4 +159,4 @@ class TextEditor(QWidget):
 
     def clear(self):
         """清除所有文本块并添加一个空的"""
-        self.set_all_content([]) 
+        self.set_all_content([])

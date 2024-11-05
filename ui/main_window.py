@@ -1,8 +1,9 @@
 from PyQt6.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, 
                            QTabWidget, QTextEdit, QPushButton, QComboBox, 
-                           QRadioButton, QLabel, QScrollArea, QFileDialog)
-from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QPixmap
+                           QRadioButton, QLabel, QScrollArea, QFileDialog, 
+                           QSizePolicy, QFrame)
+from PyQt6.QtCore import Qt, QSize
+from PyQt6.QtGui import QPixmap, QResizeEvent
 from .text_editor import TextEditor
 from .style_panel import StylePanel
 from core.image_generator import ImageGenerator
@@ -11,16 +12,16 @@ import asyncio
 import os
 import json
 from datetime import datetime
+from .styles import FusionStyle
 
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("小红书文字转图片 AI 工具")
+        self.setWindowTitle("小红书文字转图片工具")
         self.setMinimumSize(1200, 800)
         self.image_generator = ImageGenerator()
-        self.ai_helper = AIHelper()
-        self.current_images = []  # 改为列表存储多个图片
-        self.current_image_index = 0  # 当前显示的图片索引
+        self.current_images = []
+        self.current_image_index = 0
         self.init_ui()
         
     def init_ui(self):
@@ -38,15 +39,6 @@ class MainWindow(QMainWindow):
         # 创建标签页
         tabs = QTabWidget()
         
-        # AI助写标签页
-        ai_tab = QWidget()
-        ai_layout = QVBoxLayout(ai_tab)
-        self.ai_input = QTextEdit()
-        self.ai_polish_button = QPushButton("AI 分段润色")
-        ai_layout.addWidget(self.ai_input)
-        ai_layout.addWidget(self.ai_polish_button)
-        ai_tab.setLayout(ai_layout)
-        
         # 手动录入标签页
         manual_tab = QWidget()
         manual_layout = QVBoxLayout(manual_tab)
@@ -54,9 +46,8 @@ class MainWindow(QMainWindow):
         manual_layout.addWidget(self.text_editor)
         manual_tab.setLayout(manual_layout)
         
-        # 添加标签页
-        tabs.addTab(ai_tab, "AI 助写")
-        tabs.addTab(manual_tab, "手动录入")
+        # 添加标签页（只添加手动录入）
+        tabs.addTab(manual_tab, "文本编辑")
         
         # 样式面板
         self.style_panel = StylePanel()
@@ -101,24 +92,38 @@ class MainWindow(QMainWindow):
         right_scroll.setWidget(right_content)
         
         # 设置布局比例
-        main_layout.addWidget(left_panel, 40)
-        main_layout.addWidget(right_scroll, 60)
+        main_layout.addWidget(left_panel, 60)
+        main_layout.addWidget(right_scroll, 40)
+        
+        # 设置右侧预览区域的最小和最大宽度
+        right_scroll.setMinimumWidth(400)
+        right_scroll.setMaximumWidth(600)
+        
+        # 优化预览标签的大小策略
+        self.preview_label.setSizePolicy(
+            QSizePolicy.Policy.Expanding,
+            QSizePolicy.Policy.Expanding
+        )
+        
+        # 设置滚动区域的框架样式
+        right_scroll.setFrameShape(QFrame.Shape.NoFrame)
+        
+        # 添加响应式布局支持
+        self.right_content = right_content
+        self.right_scroll = right_scroll
         
         # 连接信号
         self.generate_button.clicked.connect(self.generate_image)
-        self.ai_polish_button.clicked.connect(self.polish_text)
         self.style_panel.style_changed.connect(self.preview_style_change)
         
+        # 设置生成按钮为主要按钮样式
+        self.generate_button.setObjectName("primaryButton")
+        self.download_button.setObjectName("primaryButton")
+    
     def generate_image(self):
         try:
             style = self.style_panel.get_current_style()
-            current_tab = self.findChild(QTabWidget).currentWidget()
-            
-            if isinstance(current_tab.layout().itemAt(0).widget(), QTextEdit):
-                text = self.ai_input.toPlainText()
-                content = [{'type': 'content', 'text': text}]
-            else:
-                content = self.text_editor.get_all_content()
+            content = self.text_editor.get_all_content()
             
             bg_value = style['background']
             bg_config = next((bg for bg in self.style_panel.config['backgrounds'] 
@@ -161,9 +166,11 @@ class MainWindow(QMainWindow):
         
         # 显示预览
         pixmap = QPixmap(temp_path)
-        scaled_pixmap = pixmap.scaled(self.preview_label.size(), 
-                                    Qt.AspectRatioMode.KeepAspectRatio,
-                                    Qt.TransformationMode.SmoothTransformation)
+        scaled_pixmap = pixmap.scaled(
+            self.preview_label.size(),
+            Qt.AspectRatioMode.KeepAspectRatio,
+            Qt.TransformationMode.SmoothTransformation
+        )
         self.preview_label.setPixmap(scaled_pixmap)
         
         # 清理临时文件
@@ -217,38 +224,37 @@ class MainWindow(QMainWindow):
         except Exception as e:
             print(f"保存图片错误: {str(e)}")
     
-    async def polish_text(self):
-        try:
-            self.ai_polish_button.setEnabled(False)
-            self.ai_polish_button.setText("处理中...")
-            
-            text = self.ai_input.toPlainText()
-            if not text.strip():
-                return
-                
-            polished_text = await self.ai_helper.polish_text(text)
-            
-            # 切换到手动录入标签页
-            tab_widget = self.findChild(QTabWidget)
-            tab_widget.setCurrentIndex(1)
-            
-            # 更新文本编辑器内容
-            try:
-                content = json.loads(polished_text)
-                self.text_editor.set_all_content(content)
-            except:
-                # 如果解析失败，作为普通文本处理
-                self.text_editor.set_all_content([{
-                    'type': 'content',
-                    'text': polished_text
-                }])
-                
-        except Exception as e:
-            print(f"AI处理错误: {str(e)}")
-        finally:
-            self.ai_polish_button.setEnabled(True)
-            self.ai_polish_button.setText("AI 分段润色")
-    
     def preview_style_change(self, style):
         """当样式改变时更新预览"""
         self.generate_image()
+    
+    def resizeEvent(self, event: QResizeEvent) -> None:
+        """处理窗口大小变化事件"""
+        super().resizeEvent(event)
+        self.update_preview_size()
+        
+    def update_preview_size(self):
+        """更新预览图片大小"""
+        if not self.current_images:
+            return
+            
+        # 获取滚动区域的可见大小
+        available_width = min(self.right_scroll.width() - 40, 560)  # 限制最大宽度
+        available_height = self.right_scroll.height() - 100  # 留出按钮和控件的空间
+        
+        # 计算保持宽高比的最大尺寸
+        image_ratio = 3/4  # 图片的宽高比
+        if available_width * image_ratio <= available_height:
+            # 以宽度为基准
+            preview_width = available_width
+            preview_height = available_width * image_ratio
+        else:
+            # 以高度为基准
+            preview_height = available_height
+            preview_width = available_height / image_ratio
+        
+        # 更新预览标签的固定大小
+        self.preview_label.setFixedSize(QSize(int(preview_width), int(preview_height)))
+        
+        # 更新当前显示的图片
+        self.update_preview()

@@ -1,6 +1,7 @@
 from PIL import Image, ImageDraw, ImageFont
 import os
 import textwrap
+import re
 
 class ImageGenerator:
     def __init__(self):
@@ -8,6 +9,7 @@ class ImageGenerator:
         self.height = 1440  # 3:4 比例
         self.fonts = self.load_fonts()
         self.margin = 50  # 边距
+        self.list_indent = 30  # 列表缩进
         
     def load_fonts(self):
         fonts = {}
@@ -176,43 +178,205 @@ class ImageGenerator:
         
         return total_height
 
+    def process_list_text(self, text):
+        """处理文本中的列表"""
+        lines = text.split('\n')
+        processed_lines = []
+        list_stack = []  # 用于跟踪嵌套列表
+        
+        # 扩展列表标记的正则表达式
+        ordered_patterns = [
+            r'(\d+)[.、)]\s+(.+)',  # 数字列表：1. 1、 1)
+            r'([a-z])[.、)]\s+(.+)',  # 字母列表：a. a、 a)
+            r'([A-Z])[.、)]\s+(.+)'  # 大写字母列表：A. A、 A)
+        ]
+        unordered_patterns = [
+            r'[-•*]\s+(.+)',        # 常规无序列表标记
+            r'[○●◆◇]\s+(.+)'      # 其他无序列表标记
+        ]
+        
+        def get_indent_level(line):
+            """获取缩进级别"""
+            return len(line) - len(line.lstrip())
+        
+        def is_ordered_list(line):
+            """检查是否是有序列表项"""
+            for pattern in ordered_patterns:
+                match = re.match(pattern, line.lstrip())
+                if match:
+                    return match
+            return None
+        
+        def is_unordered_list(line):
+            """检查是否是无序列表项"""
+            for pattern in unordered_patterns:
+                match = re.match(pattern, line.lstrip())
+                if match:
+                    return match
+            return None
+        
+        current_list_number = {}  # 用于跟踪每个缩进级别的编号
+        
+        for line in lines:
+            if not line.strip():
+                processed_lines.append('')
+                continue
+                
+            indent_level = get_indent_level(line)
+            stripped_line = line.lstrip()
+            
+            # 根据缩进调整列表堆栈
+            while list_stack and list_stack[-1]['indent'] >= indent_level:
+                list_stack.pop()
+                if list_stack and 'counter' in list_stack[-1]:
+                    current_list_number[list_stack[-1]['indent']] = list_stack[-1]['counter']
+            
+            # 检查是否是有序列表
+            ordered_match = is_ordered_list(stripped_line)
+            if ordered_match:
+                marker, content = ordered_match.groups()
+                
+                # 确定这个缩进级别的起始编号
+                if indent_level not in current_list_number:
+                    # 如果是字母，将其转换为数字
+                    if marker.isalpha():
+                        start_num = ord(marker.lower()) - ord('a') + 1
+                    else:
+                        start_num = int(marker)
+                    current_list_number[indent_level] = start_num
+                else:
+                    current_list_number[indent_level] += 1
+                
+                list_stack.append({
+                    'type': 'ordered',
+                    'indent': indent_level,
+                    'counter': current_list_number[indent_level],
+                    'marker_type': 'alpha' if marker.isalpha() else 'numeric'
+                })
+                
+                # 生成适当的标记
+                if list_stack[-1]['marker_type'] == 'alpha':
+                    marker = chr(ord('a') + current_list_number[indent_level] - 1)
+                    formatted_marker = f"{marker}."
+                else:
+                    formatted_marker = f"{current_list_number[indent_level]}."
+                
+                indent = ' ' * indent_level
+                processed_lines.append(f"{indent}{formatted_marker} {content}")
+                
+            # 检查是否是无序列表
+            elif is_unordered_list(stripped_line):
+                content = is_unordered_list(stripped_line).group(1)
+                
+                list_stack.append({
+                    'type': 'unordered',
+                    'indent': indent_level
+                })
+                
+                indent = ' ' * indent_level
+                processed_lines.append(f"{indent}• {content}")
+                
+            else:
+                # 普通文本行
+                processed_lines.append(line)
+                if not line.strip():
+                    list_stack = []
+                    current_list_number = {}
+        
+        return '\n'.join(processed_lines)
+    
     def get_wrapped_text(self, text, font, max_width):
-        """将文本按照最大宽度换行"""
+        """将文本按照最大宽度换行，支持列表格式"""
         lines = []
-        # 如果文本中已经有换行符，先按换行符分割
-        paragraphs = text.split('\n')
+        # 处理列表格式
+        processed_text = self.process_list_text(text)
+        paragraphs = processed_text.split('\n')
+        
+        # 计算列表标记的最大宽度
+        max_marker_width = 0
+        for paragraph in paragraphs:
+            if not paragraph.strip():
+                continue
+            # 检查是否是列表项并获取标记部分
+            list_match = re.match(r'^(\s*)((\d+[.、)]|[a-z][.、)]|\s*[-•*])\s+)(.+)$', paragraph)
+            if list_match:
+                indent = list_match.group(1)
+                marker = list_match.group(2)
+                marker_width = font.getlength(indent + marker)
+                max_marker_width = max(max_marker_width, marker_width)
         
         for paragraph in paragraphs:
             if not paragraph:
                 lines.append('')
                 continue
+            
+            # 检查是否是列表项
+            list_match = re.match(r'^(\s*)((\d+[.、)]|[a-z][.、)]|\s*[-•*])\s+)(.+)$', paragraph)
+            
+            if list_match:
+                # 分解列表项的各个部分
+                indent = list_match.group(1)
+                marker = list_match.group(2)
+                content = list_match.group(4)
                 
-            # 计算每个字符的平均宽度
-            avg_char_width = font.getlength("测") # 使用中文字符作为参考
-            
-            # 计算每行大约可以容纳多少字符
-            chars_per_line = int(max_width / avg_char_width)
-            
-            # 将段落按照计算出的字符数分行
-            while paragraph:
-                line = paragraph[:chars_per_line]
-                # 确保行宽度不超过最大宽度
-                while font.getlength(line) > max_width and len(line) > 1:
-                    line = line[:-1]
-                lines.append(line)
-                paragraph = paragraph[len(line):]
+                # 计算内容的起始位置（统一缩进）
+                content_start = max_marker_width + self.list_indent
+                
+                # 计算实际可用宽度
+                available_width = max_width - content_start
+                
+                # 处理第一行（包含标记）
+                first_line = indent + marker + content
+                
+                # 确保第一行不会太长
+                while font.getlength(first_line) > max_width and len(content) > 1:
+                    content = content[:-1]
+                    first_line = indent + marker + content
+                
+                lines.append(first_line)
+                
+                # 处理剩余内容
+                remaining_content = content[len(content):]
+                if remaining_content:
+                    # 创建后续行的缩进
+                    subsequent_indent = ' ' * int(content_start / font.getlength(' '))
+                    
+                    while remaining_content:
+                        # 计算这一行可以容纳多少字符
+                        line = subsequent_indent
+                        for char in remaining_content:
+                            test_line = line + char
+                            if font.getlength(test_line) > max_width:
+                                break
+                            line = test_line
+                        
+                        lines.append(line)
+                        remaining_content = remaining_content[len(line)-len(subsequent_indent):]
+            else:
+                # 处理非列表项文本
+                current_text = paragraph
+                while current_text:
+                    line = ''
+                    for char in current_text:
+                        test_line = line + char
+                        if font.getlength(test_line) > max_width:
+                            break
+                        line = test_line
+                    
+                    lines.append(line)
+                    current_text = current_text[len(line):]
         
         return lines
-        
+    
     def render_text(self, draw, text_content, font):
         """渲染文字到图片上"""
         current_y = self.margin
-        max_width = self.width - (self.margin * 2)  # 考虑左右边距
+        max_width = self.width - (self.margin * 2)
         
         for item in text_content:
             if not item.get('text', '').strip():
                 continue
-                
+            
             # 设置不同类型文本的字体大小
             if item['type'] == 'title':
                 font_size = 48
@@ -221,12 +385,8 @@ class ImageGenerator:
                 font_size = 32
                 line_spacing = 45
             
-            # 调整字体大小
             try:
-                if item['type'] == 'title':
-                    current_font = ImageFont.truetype(font.path, font_size)
-                else:
-                    current_font = ImageFont.truetype(font.path, font_size)
+                current_font = ImageFont.truetype(font.path, font_size)
             except Exception as e:
                 print(f"调整字体大小失败: {str(e)}")
                 continue
@@ -239,12 +399,14 @@ class ImageGenerator:
                 if not line:  # 空行处理
                     current_y += line_spacing // 2
                     continue
-                    
-                # 计算文本宽度用于居中（仅标题居中）
+                
+                # 计算文本位置
                 if item['type'] == 'title':
+                    # 标题居中
                     text_width = current_font.getlength(line)
                     x = (self.width - text_width) // 2
                 else:
+                    # 正文左对齐
                     x = self.margin
                 
                 # 绘制文本
