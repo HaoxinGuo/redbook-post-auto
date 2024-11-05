@@ -104,3 +104,16 @@ roject/
 - [ ] 模板系统
 - [ ] 云端存储
 - [ ] 批量处理
+Windows系统：
+
+# 安装依赖
+pip install pyinstaller pillow pyqt6
+
+# 运行打包脚本
+python build_windows.py
+Mac系统：
+# 安装依赖
+pip3 install pyinstaller pillow pyqt6
+
+# 运行打包脚本
+python3 build_mac.py
