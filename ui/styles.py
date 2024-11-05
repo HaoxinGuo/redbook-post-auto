@@ -18,7 +18,7 @@ class FusionStyle:
         app.setStyle(QStyleFactory.create("Fusion"))
         
         # 设置应用字体
-        font = QFont("Microsoft YaHei UI", 9)  # 使用微软雅黑UI字体
+        font = QFont("Microsoft YaHei UI", 9)
         app.setFont(font)
         
         # 创建调色板
@@ -71,14 +71,27 @@ class FusionStyle:
                 background-color: #0958D9;
             }
             
-            QTextEdit, QComboBox {
+            QTextEdit {
                 border: 1px solid #D9D9D9;
                 border-radius: 4px;
                 padding: 6px;
                 background-color: white;
             }
             
-            QTextEdit:focus, QComboBox:focus {
+            QComboBox {
+                border: 1px solid #D9D9D9;
+                border-radius: 4px;
+                padding: 6px;
+                background-color: white;
+                color: #2A2A2A;
+                selection-background-color: transparent;
+            }
+            
+            QComboBox:hover {
+                border-color: #4096FF;
+            }
+            
+            QComboBox:focus {
                 border-color: #4096FF;
                 outline: none;
             }
@@ -92,6 +105,31 @@ class FusionStyle:
                 image: url(resources/icons/down-arrow.png);
                 width: 12px;
                 height: 12px;
+            }
+            
+            QComboBox QAbstractItemView {
+                border: 1px solid #D9D9D9;
+                border-radius: 4px;
+                background-color: white;
+                selection-background-color: #F5F5F5;
+                selection-color: #2A2A2A;
+                outline: none;
+            }
+            
+            QComboBox QAbstractItemView::item {
+                height: 30px;
+                padding: 4px 8px;
+                color: #2A2A2A;
+            }
+            
+            QComboBox QAbstractItemView::item:hover {
+                background-color: #E6F4FF;
+                color: #2A2A2A;
+            }
+            
+            QComboBox QAbstractItemView::item:selected {
+                background-color: #F0F5FF;
+                color: #1677FF;
             }
             
             QScrollArea {
@@ -126,4 +164,32 @@ class FusionStyle:
             QTabBar::tab:hover {
                 background-color: #E6E6E6;
             }
-        """) 
+            
+            /* 滚动条样式 */
+            QScrollBar:vertical {
+                border: none;
+                background: #F5F5F5;
+                width: 8px;
+                border-radius: 4px;
+            }
+
+            QScrollBar::handle:vertical {
+                background: #D9D9D9;
+                border-radius: 4px;
+                min-height: 20px;
+            }
+
+            QScrollBar::handle:vertical:hover {
+                background: #BFBFBF;
+            }
+
+            QScrollBar::add-line:vertical,
+            QScrollBar::sub-line:vertical {
+                height: 0px;
+            }
+
+            QScrollBar::add-page:vertical,
+            QScrollBar::sub-page:vertical {
+                background: none;
+            }
+        """)

@@ -17,7 +17,7 @@
         }
     ],
     "fonts": {
-        "normal": "resources/fonts/MSYH.TTF",
+        "normal": "resources/fonts/normal.ttf",
         "handwritten": "resources/fonts/handwritten.ttf"
     },
     "api": {

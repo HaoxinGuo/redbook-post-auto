@@ -120,4 +120,4 @@ class StylePanel(QWidget):
         if 'text_color' in style_dict:
             self.text_color_button.setStyleSheet(
                 f"background-color: {style_dict['text_color']}"
-            ) 
+            )

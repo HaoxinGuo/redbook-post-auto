@@ -13,6 +13,7 @@ import os
 import json
 from datetime import datetime
 from .styles import FusionStyle
+from PIL import Image
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -23,6 +24,8 @@ class MainWindow(QMainWindow):
         self.current_images = []
         self.current_image_index = 0
         self.init_ui()
+        # 初始化时显示默认背景
+        self.preview_background()
         
     def init_ui(self):
         # 创建中心部件
@@ -226,7 +229,12 @@ class MainWindow(QMainWindow):
     
     def preview_style_change(self, style):
         """当样式改变时更新预览"""
-        self.generate_image()
+        if self.current_images:
+            # 如果已经生成了图片，则重新生成
+            self.generate_image()
+        else:
+            # 如果还没有生成图片，只预览背景
+            self.preview_background()
     
     def resizeEvent(self, event: QResizeEvent) -> None:
         """处理窗口大小变化事件"""
@@ -235,9 +243,6 @@ class MainWindow(QMainWindow):
         
     def update_preview_size(self):
         """更新预览图片大小"""
-        if not self.current_images:
-            return
-            
         # 获取滚动区域的可见大小
         available_width = min(self.right_scroll.width() - 40, 560)  # 限制最大宽度
         available_height = self.right_scroll.height() - 100  # 留出按钮和控件的空间
@@ -256,5 +261,53 @@ class MainWindow(QMainWindow):
         # 更新预览标签的固定大小
         self.preview_label.setFixedSize(QSize(int(preview_width), int(preview_height)))
         
-        # 更新当前显示的图片
-        self.update_preview()
+        # 更新当前显示的图片或背景
+        if self.current_images:
+            self.update_preview()
+        else:
+            self.preview_background()
+    
+    def preview_background(self):
+        """预览当前选择的背景"""
+        try:
+            # 获取当前选择的背景
+            style = self.style_panel.get_current_style()
+            bg_value = style['background']
+            bg_config = next((bg for bg in self.style_panel.config['backgrounds'] 
+                            if bg['value'] == bg_value), None)
+            
+            if bg_config and bg_config['url']:
+                # 创建一个空白图片
+                image = Image.new('RGB', (self.image_generator.width, self.image_generator.height), 'white')
+                
+                # 加载并粘贴背景
+                try:
+                    bg = Image.open(bg_config['url'])
+                    bg = bg.resize((self.image_generator.width, self.image_generator.height))
+                    image.paste(bg, (0, 0))
+                    
+                    # 保存临时文件并显示
+                    temp_path = 'temp_preview.png'
+                    image.save(temp_path)
+                    
+                    # 显示预览
+                    pixmap = QPixmap(temp_path)
+                    scaled_pixmap = pixmap.scaled(
+                        self.preview_label.size(),
+                        Qt.AspectRatioMode.KeepAspectRatio,
+                        Qt.TransformationMode.SmoothTransformation
+                    )
+                    self.preview_label.setPixmap(scaled_pixmap)
+                    
+                    # 清理临时文件
+                    os.remove(temp_path)
+                except Exception as e:
+                    print(f"背景图片加载失败: {str(e)}")
+                    self.preview_label.setText("背景预览失败")
+            else:
+                # 如果没有背景配置，显示空白
+                self.preview_label.setText("无背景预览")
+                
+        except Exception as e:
+            print(f"背景预览错误: {str(e)}")
+            self.preview_label.setText("预览失败")
