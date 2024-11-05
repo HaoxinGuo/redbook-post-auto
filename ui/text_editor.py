@@ -41,8 +41,8 @@ class TextBlock(QWidget):
         
         # 删除按钮
         delete_button = QPushButton("×")
-        delete_button.setMaximumWidth(30)
-        delete_button.setMinimumHeight(30)
+        delete_button.setMaximumWidth(40)
+        delete_button.setMinimumHeight(40)
         delete_button.clicked.connect(lambda: self.deleted.emit(self))
         button_layout.addWidget(delete_button)
         button_layout.addStretch()  # 添加弹性空间
