@@ -127,7 +127,7 @@ class ImageGenerator:
                             'text': first_part
                         })
                         images.append(self.create_single_image(current_content, background_path, font_style))
-                        print(f"创建新页面，当前总页数: {len(images)}")
+                        print(f"创建新页面，当前总���数: {len(images)}")
                         current_content = []
                         current_y = self.margin
                     
@@ -327,7 +327,7 @@ class ImageGenerator:
                 
                 # 如果是新的缩进级别或新的列表开始
                 if indent_level not in current_list_number:
-                    # 保存起始值
+                    # 保存起始��
                     if marker.isalpha():
                         start_num = ord(marker.lower()) - ord('a') + 1
                     else:

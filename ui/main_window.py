@@ -14,6 +14,7 @@ import json
 from datetime import datetime
 from .styles import FusionStyle
 from PIL import Image
+from PyQt6.QtCore import QTimer
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -24,6 +25,10 @@ class MainWindow(QMainWindow):
         self.current_images = []
         self.current_image_index = 0
         self.init_ui()
+        
+        # 在显示窗口之前先计算一次预览尺寸
+        self.calculate_initial_preview_size()
+        
         # 初始化时显示默认背景
         self.preview_background()
         
@@ -115,17 +120,9 @@ class MainWindow(QMainWindow):
         
         # 创建预览内容容器
         preview_content = QWidget()
-        preview_layout = QVBoxLayout(preview_content)
-        preview_layout.setContentsMargins(20, 20, 20, 20)  # 设置边距
-        preview_layout.setSpacing(0)
-        preview_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        
-        # 创建滚动区域
-        self.right_scroll = QScrollArea()
-        self.right_scroll.setWidgetResizable(True)
-        self.right_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        self.right_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
-        self.right_scroll.setAlignment(Qt.AlignmentFlag.AlignCenter)  # 设置滚动区域内容居中
+        preview_content_layout = QVBoxLayout(preview_content)  # 创建预览内容的布局
+        preview_content_layout.setContentsMargins(0, 0, 0, 0)
+        preview_content_layout.setSpacing(0)
         
         # 创建预览内容的容器
         preview_widget = QWidget()
@@ -141,16 +138,26 @@ class MainWindow(QMainWindow):
             QSizePolicy.Policy.Expanding,
             QSizePolicy.Policy.Expanding
         )
-        self.preview_label.setMinimumSize(400, 533)  # 设置最小尺寸，保持3:4比例
+        # 设置初始最小尺寸
+        initial_width = 400
+        initial_height = int(initial_width * 4/3)  # 保持3:4比例
+        self.preview_label.setMinimumSize(initial_width, initial_height)
         
         # 将预览标签添加到预览内容容器
         preview_widget_layout.addWidget(self.preview_label)
+        
+        # 创建滚动区域
+        self.right_scroll = QScrollArea()
+        self.right_scroll.setWidgetResizable(True)
+        self.right_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.right_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        self.right_scroll.setAlignment(Qt.AlignmentFlag.AlignCenter)
         
         # 将预览内容容器设置为滚动区域的widget
         self.right_scroll.setWidget(preview_widget)
         
         # 将滚动区域添加到预览内容布局
-        preview_layout.addWidget(self.right_scroll)
+        preview_content_layout.addWidget(self.right_scroll)
         
         # 将导航容器和预览内容添加到右侧面板布局
         right_layout.addWidget(nav_container)
@@ -326,11 +333,19 @@ class MainWindow(QMainWindow):
         super().resizeEvent(event)
         self.update_preview_size()
         
-    def update_preview_size(self):
-        """更新预览图片大小"""
-        # 获取预览容器的可见大小
-        available_width = self.right_scroll.viewport().width() - 40  # 减去左右边距
-        available_height = self.right_scroll.viewport().height() - 40  # 减去上下边距
+    def calculate_initial_preview_size(self):
+        """计算初始预览尺寸"""
+        # 获取右侧面板的初始尺寸
+        right_width = int(self.width() * 0.4)  # 右侧面板占40%
+        right_height = self.height()
+        
+        # 计算可用空间，考虑边距和导航按钮
+        available_width = right_width - 100  # 减去导航按钮宽度和边距
+        available_height = right_height - 40  # 减去上下边距
+        
+        # 确保可用尺寸不小于最小值
+        available_width = max(400, available_width)
+        available_height = max(533, available_height)
         
         # 计算保持宽高比的最大尺寸
         image_ratio = 3/4  # 图片的宽高比
@@ -344,6 +359,44 @@ class MainWindow(QMainWindow):
             # 如果容器更高，以宽度为基准
             preview_width = available_width
             preview_height = preview_width * image_ratio
+        
+        # 更新预览标签的固定大小
+        self.preview_label.setFixedSize(QSize(int(preview_width), int(preview_height)))
+    
+    def update_preview_size(self):
+        """更新预览图片大小"""
+        # 获取滚动区域的可见大小
+        viewport_width = self.right_scroll.viewport().width()
+        viewport_height = self.right_scroll.viewport().height()
+        
+        # 计算可用空间，考虑边距和导航按钮
+        available_width = viewport_width - 40  # 减去左右边距
+        available_height = viewport_height - 40  # 减去上下边距
+        
+        # 确保可用尺寸不小于最小值
+        available_width = max(400, available_width)
+        available_height = max(533, available_height)
+        
+        # 计算保持宽高比的最大尺寸
+        image_ratio = 3/4  # 图片的宽高比
+        
+        # 计算基于宽度和高度的可能尺寸
+        width_based_height = available_width * image_ratio
+        height_based_width = available_height / image_ratio
+        
+        # 选择较小的尺寸以确保完全可见
+        if width_based_height <= available_height:
+            # 以宽度为基准
+            preview_width = available_width
+            preview_height = width_based_height
+        else:
+            # 以高度为基准
+            preview_width = height_based_width
+            preview_height = available_height
+        
+        # 确保尺寸不超过可见区域
+        preview_width = min(preview_width, available_width)
+        preview_height = min(preview_height, available_height)
         
         # 更新预览标签的固定大小
         self.preview_label.setFixedSize(QSize(int(preview_width), int(preview_height)))
@@ -364,37 +417,25 @@ class MainWindow(QMainWindow):
                             if bg['value'] == bg_value), None)
             
             if bg_config and bg_config['url']:
-                # 创建一个空白图片
-                image = Image.new('RGB', (self.image_generator.width, self.image_generator.height), 'white')
+                # 加载背景图片
+                pixmap = QPixmap(bg_config['url'])
                 
-                # 加载并粘贴背景
-                try:
-                    bg = Image.open(bg_config['url'])
-                    bg = bg.resize((self.image_generator.width, self.image_generator.height))
-                    image.paste(bg, (0, 0))
-                    
-                    # 保存临时文件并显示
-                    temp_path = 'temp_preview.png'
-                    image.save(temp_path)
-                    
-                    # 显示预览
-                    pixmap = QPixmap(temp_path)
-                    scaled_pixmap = pixmap.scaled(
-                        self.preview_label.size(),
-                        Qt.AspectRatioMode.KeepAspectRatio,
-                        Qt.TransformationMode.SmoothTransformation
-                    )
-                    self.preview_label.setPixmap(scaled_pixmap)
-                    
-                    # 清理临时文件
-                    os.remove(temp_path)
-                except Exception as e:
-                    print(f"背景图片加载失败: {str(e)}")
-                    self.preview_label.setText("背景预览失败")
+                # 获取预览标签的大小
+                label_size = self.preview_label.size()
+                
+                # 缩放图片以填充预览标签，保持宽高比
+                scaled_pixmap = pixmap.scaled(
+                    label_size,
+                    Qt.AspectRatioMode.KeepAspectRatio,
+                    Qt.TransformationMode.SmoothTransformation
+                )
+                
+                # 显示预览
+                self.preview_label.setPixmap(scaled_pixmap)
             else:
                 # 如果没有背景配置，显示空白
-                self.preview_label.setText("无背景预览")
+                self.preview_label.clear()
                 
         except Exception as e:
             print(f"背景预览错误: {str(e)}")
-            self.preview_label.setText("预览失败")
+            self.preview_label.clear()
