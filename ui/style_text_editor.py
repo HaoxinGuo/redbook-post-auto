@@ -35,6 +35,8 @@ class StyleTextEditor(QWidget):
         # 字号控制
         font_size_label = QLabel("字体大小：")
         self.font_size_spin = QSpinBox()
+        self.font_size_spin.setFixedWidth(80)  # 设置固定宽度
+        self.font_size_spin.setFixedHeight(30)
         self.font_size_spin.setRange(12, 200)  # 设置字号范围
         self.font_size_spin.setValue(self.font_size)
         self.font_size_spin.valueChanged.connect(self.on_font_size_changed)
@@ -60,11 +62,12 @@ class StyleTextEditor(QWidget):
         self.text_edit.setMinimumHeight(100)
         self.text_edit.textChanged.connect(self.on_text_changed)
         self.text_edit.selectionChanged.connect(self.on_selection_changed)
+        # 设置文本编辑框的样式，使用较小的字体大小以便编辑
         self.text_edit.setStyleSheet("""
             QTextEdit {
                 padding: 10px;
                 line-height: 1.5;
-                font-size: 14px;
+                font-size: 14px;  /* 编辑时使用较小的字体 */
             }
         """)
         layout.addWidget(self.text_edit)
@@ -116,18 +119,24 @@ class StyleTextEditor(QWidget):
         # 椭圆控制选项
         position_label = QLabel("位置：")
         self.position_spin = QSpinBox()
+        self.position_spin.setFixedWidth(80)  # 设置固定宽度
+        self.position_spin.setFixedHeight(30)
         self.position_spin.setRange(-20, 20)
         self.position_spin.setValue(0)
         self.position_spin.setToolTip("调整椭圆的垂直位置")
         
         size_label = QLabel("大小：")
         self.size_spin = QSpinBox()
+        self.size_spin.setFixedWidth(80)  # 设置固定宽度
+        
         self.size_spin.setRange(5, 100)
         self.size_spin.setValue(30)
         self.size_spin.setToolTip("调整椭圆的大小")
         
         width_label = QLabel("粗细：")
         self.width_spin = QSpinBox()
+        self.width_spin.setFixedWidth(80)  # 设置固定宽度
+        self.width_spin.setFixedHeight(30)
         self.width_spin.setRange(1, 100)
         self.width_spin.setValue(5)
         self.width_spin.setToolTip("调整椭圆线条的粗细")
@@ -158,12 +167,16 @@ class StyleTextEditor(QWidget):
         # 下划线控制选项
         underline_width_label = QLabel("粗细：")
         self.underline_width_spin = QSpinBox()
+        self.underline_width_spin.setFixedWidth(80)  # 设置固定宽度
+        self.underline_width_spin.setFixedHeight(30)
         self.underline_width_spin.setRange(1, 50)
         self.underline_width_spin.setValue(15)
         self.underline_width_spin.setToolTip("调整下划线的粗细")
         
         underline_offset_label = QLabel("距离：")
         self.underline_offset_spin = QSpinBox()
+        self.underline_offset_spin.setFixedWidth(80)  # 设置固定宽度
+        self.underline_offset_spin.setFixedHeight(30)
         self.underline_offset_spin.setRange(0, 50)
         self.underline_offset_spin.setValue(30)
         self.underline_offset_spin.setToolTip("调整下划线与文字的距离")
@@ -201,14 +214,18 @@ class StyleTextEditor(QWidget):
         # 字间距控制
         char_spacing_label = QLabel("字间距：")
         self.char_spacing_spin = QSpinBox()
-        self.char_spacing_spin.setRange(0, 100)  # 字间距范围0-100像素
+        self.char_spacing_spin.setFixedWidth(80)  # 设置固定宽度
+        self.char_spacing_spin.setFixedHeight(30)
+        self.char_spacing_spin.setRange(0, 100)
         self.char_spacing_spin.setValue(40)
         self.char_spacing_spin.setToolTip("调整字符之间的间距")
         
         # 行间距控制
         line_spacing_label = QLabel("行间距：")
         self.line_spacing_spin = QSpinBox()
-        self.line_spacing_spin.setRange(0, 200)  # 行间距范围0-200像素
+        self.line_spacing_spin.setFixedWidth(80)  # 设置固定宽度
+        self.line_spacing_spin.setFixedHeight(30)
+        self.line_spacing_spin.setRange(0, 200)
         self.line_spacing_spin.setValue(50)
         self.line_spacing_spin.setToolTip("调整行与行之间的间距")
         
@@ -424,8 +441,10 @@ class StyleTextEditor(QWidget):
     def on_font_size_changed(self, size):
         """当字号改变时"""
         self.font_size = size
-        self.update_text_edit_font()
-        self.update_all_char_buttons()
+        # 更新编辑器字体，但保持编辑时的字体大小不变
+        font = QFont("Microsoft YaHei UI", 14)  # 保持编辑时的字体大小为14pt
+        font.setBold(self.font_bold)
+        self.text_edit.setFont(font)
         self.font_changed.emit()
         self.style_applied.emit()
 

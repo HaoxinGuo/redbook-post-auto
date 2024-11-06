@@ -1,13 +1,15 @@
 import sys
 from PyQt6.QtWidgets import QApplication
+from PyQt6.QtGui import QIcon
 from ui.main_window import MainWindow
-from ui.styles import FusionStyle
+import os
 
 def main():
     app = QApplication(sys.argv)
     
-    # 应用 Fusion 风格
-    FusionStyle.apply_fusion_style(app)
+    # 设置应用程序图标
+    icon_path = os.path.join('resources', 'icon.png')  # 确保这个路径存在
+    app.setWindowIcon(QIcon(icon_path))
     
     window = MainWindow()
     window.show()
