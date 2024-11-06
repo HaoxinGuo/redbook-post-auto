@@ -45,15 +45,16 @@ class ImageGenerator:
                 remaining_content.pop(0)
                 continue
             
-            # 计算当前内容块所需的高度
-            if item['type'] == 'title':
-                font_size = 48
-                line_spacing = item.get('line_spacing', 60)
-                print(f"标题字体大小: {font_size}, 行间距: {line_spacing}")
+            # 使用内容块自带的字体大小
+            font_size = item.get('font_size')
+            if font_size is None:
+                font_size = 48 if item['type'] == 'title' else 32
+                print(f"使用默认字体大小: {font_size}")
             else:
-                font_size = 32
-                line_spacing = item.get('line_spacing', 45)
-                print(f"正文字体大小: {font_size}, 行间距: {line_spacing}")
+                print(f"使用自定义字体大小: {font_size}")
+            
+            line_spacing = item.get('line_spacing', 45)
+            print(f"行间距: {line_spacing}")
             
             try:
                 current_font = ImageFont.truetype(self.fonts[font_style].path, font_size)
@@ -84,12 +85,14 @@ class ImageGenerator:
                     first_part = {
                         'type': item['type'],
                         'text': '\n'.join(lines[:max_lines]),
-                        'line_spacing': line_spacing
+                        'line_spacing': line_spacing,
+                        'font_size': font_size  # 保持字体大小
                     }
                     second_part = {
                         'type': item['type'],
                         'text': '\n'.join(lines[max_lines:]),
-                        'line_spacing': line_spacing
+                        'line_spacing': line_spacing,
+                        'font_size': font_size  # 保持字体大小
                     }
                     
                     print(f"分割为两部分:")
@@ -169,12 +172,9 @@ class ImageGenerator:
             if not item.get('text', '').strip():
                 continue
                 
-            if item['type'] == 'title':
-                font_size = 48
-                line_spacing = item.get('line_spacing', 60)
-            else:
-                font_size = 32
-                line_spacing = item.get('line_spacing', 45)
+            # 使用内容块自带的字体大小
+            font_size = item.get('font_size', 48 if item['type'] == 'title' else 32)
+            line_spacing = item.get('line_spacing', 60 if item['type'] == 'title' else 45)
             
             try:
                 current_font = ImageFont.truetype(font.path, font_size)
@@ -194,16 +194,15 @@ class ImageGenerator:
         return total_height
     
     def split_content_block(self, content_block, font, available_height):
-        """将内容块分成两部分，以适应可用高度"""
+        """将内容块分割成两部分，以适应可用高度"""
         if not content_block.get('text', '').strip():
             return None, None
             
-        if content_block['type'] == 'title':
-            font_size = 48
-            line_spacing = content_block.get('line_spacing', 60)
-        else:
-            font_size = 32
-            line_spacing = content_block.get('line_spacing', 45)
+        # 使用内容块自带的字体大小
+        font_size = content_block.get('font_size', 
+                                    48 if content_block['type'] == 'title' else 32)
+        line_spacing = content_block.get('line_spacing', 
+                                       60 if content_block['type'] == 'title' else 45)
         
         try:
             current_font = ImageFont.truetype(font.path, font_size)
@@ -315,7 +314,7 @@ class ImageGenerator:
         processed_lines = []
         list_stack = []  # 用于跟踪嵌套列表
         
-        # 扩展列表标记的正则表达式
+        # 扩展列表标记正则表达式
         ordered_patterns = [
             r'(\d+)[.、)]\s+(.+)',  # 数字列表：1. 1、 1)
             r'([a-z])[.、)]\s+(.+)',  # 字母列表：a. a、 a)
@@ -515,78 +514,107 @@ class ImageGenerator:
         current_y = self.margin
         max_width = self.width - (self.margin * 2)
         
-        print(f"\n开始渲染文本，内容块数量: {len(text_content)}")
+        print(f"\n=== 开始渲染文本 ===")
+        print(f"总内容块数: {len(text_content)}")
+        
+        # 获取第一个内容块的行间距作为统一行间距
+        global_line_spacing = None
+        for item in text_content:
+            if item.get('text', '').strip() and item['type'] == 'content':
+                global_line_spacing = item.get('line_spacing', 45)
+                print(f"使用全局行间距: {global_line_spacing}")
+                break
+        
+        if global_line_spacing is None:
+            global_line_spacing = 45  # 如果没有找到内容块，使用默认值
+            print(f"使用默认行间距: {global_line_spacing}")
+        
+        # 计算当前页面已使用的高度
+        total_height = 0
         
         for item in text_content:
             if not item.get('text', '').strip():
                 print("跳过空内容块")
                 continue
             
-            print(f"\n渲染内容块:")
+            print(f"\n--- 渲染内容块 ---")
             print(f"类型: {item['type']}")
-            print(f"内容长度: {len(item.get('text', ''))}")
+            print(f"内容: {item.get('text', '')[:50]}...")
             print(f"当前Y位置: {current_y}")
             
-            # 设置不同类型文本的字体大小和样式
-            if item['type'] == 'title':
-                font_size = 48
-                line_spacing = item.get('line_spacing', 60)  # 使用自定义行间距，默认60
-                alignment = 'center'
+            # 使用内容块自带的字体大小
+            font_size = item.get('font_size')
+            if font_size is None:
+                font_size = 48 if item['type'] == 'title' else 32
+                print(f"使用默认字体大小: {font_size}")
             else:
-                font_size = 32
-                line_spacing = item.get('line_spacing', 45)  # 使用自定义行间距，默认45
-                alignment = 'left'
+                print(f"使用自定义字体大小: {font_size}")
+            
+            # 使用统一的行间距
+            line_spacing = global_line_spacing
+            print(f"使用行间距: {line_spacing}")
+            alignment = 'center' if item['type'] == 'title' else 'left'
+            print(f"对齐方式: {alignment}")
             
             try:
+                print(f"尝试加载字体: {font.path}, 大小: {font_size}")
                 current_font = ImageFont.truetype(font.path, font_size)
+                print("字体加载成功")
             except Exception as e:
-                print(f"调整字体大小失败: {str(e)}")
+                print(f"字体加载失败: {str(e)}")
                 continue
             
             # 获取换行后的文本
             lines = self.get_wrapped_text(item['text'], current_font, max_width)
-            print(f"文本行数: {len(lines)}")
+            print(f"文本分行数: {len(lines)}")
             
             # 计算此内容块的总高度
-            total_height = len(lines) * line_spacing
-            print(f"内容块总高度: {total_height}")
+            block_height = len(lines) * line_spacing
+            total_height += block_height
+            print(f"内容块总高度: {block_height}")
+            print(f"当前总高度: {total_height}")
             
             # 检查是否会超出页面底部
-            if current_y + total_height > self.height - self.margin:
-                print(f"警告：内容超出页面底部，需要分页。需要高度: {current_y + total_height}, 最大高度: {self.height - self.margin}")
-                return False  # 返回False表示需要分页
+            if total_height > self.height - self.margin * 2:
+                print(f"警告：内容超出页面底部，需要分页")
+                print(f"需要总高度: {total_height}")
+                print(f"最大可用高度: {self.height - self.margin * 2}")
+                return False
             
             # 渲染每一行
             for line_num, line in enumerate(lines):
-                if not line:  # 空行处理
+                if not line:
                     current_y += line_spacing // 2
                     print(f"空行处理，Y位置更新到: {current_y}")
                     continue
                 
                 # 计算文本位置
                 if alignment == 'center':
-                    # 标题居中
                     text_width = current_font.getlength(line)
                     x = (self.width - text_width) // 2
                     print(f"标题居中，X位置: {x}")
                 else:
-                    # 正文左对齐
                     x = self.margin
                     print(f"正文左对齐，X位置: {x}")
                 
                 try:
-                    # 绘制文本
+                    print(f"渲染第 {line_num + 1} 行文本:")
+                    print(f"位置: ({x}, {current_y})")
+                    print(f"内容: {line}")
+                    print(f"字体大小: {font_size}")
                     draw.text((x, current_y), line, font=current_font, fill='black')
-                    print(f"渲染第 {line_num + 1} 行文本，位置: ({x}, {current_y})")
                     current_y += line_spacing
                 except Exception as e:
                     print(f"渲染文本失败: {str(e)}")
             
-            # 在不同文本块之间添加额外的间距
-            current_y += line_spacing // 2
-            print(f"添加额外间距，Y位置更新到: {current_y}")
+            # 在不同文本块之间添加额外的间距（使用统一行间距）
+            if item != text_content[-1]:  # 如果不是最后一个内容块
+                current_y += line_spacing // 2
+                total_height += line_spacing // 2
+                print(f"添加额外间距，Y位置更新到: {current_y}")
         
-        return True  # 返回True表示渲染成功
+        print("\n=== 渲染完成 ===")
+        return True
 
     def draw_styled_text(self, draw, text, marks, x, y, font, char_spacing=0, line_spacing=20):
         """绘制带样式的文本"""

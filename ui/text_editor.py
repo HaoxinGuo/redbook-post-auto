@@ -116,6 +116,33 @@ class TextEditor(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(10)
 
+        # 添加字体大小控制面板
+        font_control = QWidget()
+        font_control_layout = QHBoxLayout(font_control)
+        font_control_layout.setContentsMargins(0, 0, 0, 0)
+        
+        # 标题字体大小控制
+        title_font_label = QLabel("标题字号：")
+        self.title_font_spin = QSpinBox()
+        self.title_font_spin.setRange(24, 120)  # 标题字号范围24-120像素
+        self.title_font_spin.setValue(72)  # 默认值72
+        self.title_font_spin.setToolTip("调整标题文字的大小")
+        
+        # 内容字体大小控制
+        content_font_label = QLabel("内容字号：")
+        self.content_font_spin = QSpinBox()
+        self.content_font_spin.setRange(24, 96)  # 内容字号范围24-96像素
+        self.content_font_spin.setValue(48)  # 默认值48
+        self.content_font_spin.setToolTip("调整内容文字的大小")
+        
+        font_control_layout.addWidget(title_font_label)
+        font_control_layout.addWidget(self.title_font_spin)
+        font_control_layout.addWidget(content_font_label)
+        font_control_layout.addWidget(self.content_font_spin)
+        font_control_layout.addStretch()
+        
+        layout.addWidget(font_control)
+
         # 添加行间距控制
         spacing_control = QWidget()
         spacing_layout = QHBoxLayout(spacing_control)
@@ -190,11 +217,17 @@ class TextEditor(QWidget):
             self.content_changed.emit()
 
     def get_all_content(self):
-        """获取所有内容，包括行间距设置"""
+        """获取所有内容，包括行间距和字体大小设置"""
         content = [block.get_content() for block in self.text_blocks]
-        # 添加行间距信息
+        # 添加行间距和字体大小信息
         for item in content:
             item['line_spacing'] = self.line_spacing_spin.value()
+            if item['type'] == 'title':
+                item['font_size'] = self.title_font_spin.value()
+                print(f"设置标题字体大小: {self.title_font_spin.value()}")
+            else:
+                item['font_size'] = self.content_font_spin.value()
+                print(f"设置内容字体大小: {self.content_font_spin.value()}")
         return content
 
     def set_all_content(self, content_list):
