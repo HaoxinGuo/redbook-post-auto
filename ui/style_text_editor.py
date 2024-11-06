@@ -128,6 +128,7 @@ class StyleTextEditor(QWidget):
         size_label = QLabel("大小：")
         self.size_spin = QSpinBox()
         self.size_spin.setFixedWidth(80)  # 设置固定宽度
+        self.size_spin.setFixedHeight(30)
         
         self.size_spin.setRange(5, 100)
         self.size_spin.setValue(30)
@@ -138,7 +139,7 @@ class StyleTextEditor(QWidget):
         self.width_spin.setFixedWidth(80)  # 设置固定宽度
         self.width_spin.setFixedHeight(30)
         self.width_spin.setRange(1, 100)
-        self.width_spin.setValue(5)
+        self.width_spin.setValue(15)
         self.width_spin.setToolTip("调整椭圆线条的粗细")
         
         self.color_button = QPushButton("选择颜色")
