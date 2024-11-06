@@ -76,7 +76,7 @@ try:
         '--name=小红书文字转图片工具',
         '--windowed',
         '--onefile',
-        '--icon=resources/app_icon.ico',
+        '--icon=resources/icons/app_icon.ico',
         '--add-data=resources;resources',
         '--noconfirm',
     ])

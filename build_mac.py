@@ -40,7 +40,7 @@ PyInstaller.__main__.run([
     '--name=小红书文字转图片工具',
     '--windowed',
     '--onefile',
-    '--icon=resources/icon.icns',
+    '--icon=resources/icons/app_icon.icns',
     '--add-data=resources:resources',
     '--noconfirm',
 ]) 
