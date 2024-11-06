@@ -110,55 +110,58 @@ class TextEditor(QWidget):
         super().__init__(parent)
         self.text_blocks = []
         self.init_ui()
+        # 添加一个默认的标题文本块
+        first_block = TextBlock()
+        first_block.deleted.connect(self.remove_text_block)
+        first_block.type_combo.setCurrentText("标题")  # 设置第一个文本块为标题类型
+        self.text_blocks.append(first_block)
+        self.blocks_layout.addWidget(first_block)
 
     def init_ui(self):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(10)
 
-        # 添加字体大小控制面板
-        font_control = QWidget()
-        font_control_layout = QHBoxLayout(font_control)
-        font_control_layout.setContentsMargins(0, 0, 0, 0)
+        # 创建参数控制面板
+        params_control = QWidget()
+        params_layout = QHBoxLayout(params_control)  # 使用水平布局
+        params_layout.setContentsMargins(0, 0, 0, 0)
         
-        # 标题字体大小控制
+        # 标题字号控制
         title_font_label = QLabel("标题字号：")
         self.title_font_spin = QSpinBox()
-        self.title_font_spin.setRange(24, 120)  # 标题字号范围24-120像素
-        self.title_font_spin.setValue(72)  # 默认值72
+        self.title_font_spin.setRange(24, 120)
+        self.title_font_spin.setValue(60)
         self.title_font_spin.setToolTip("调整标题文字的大小")
         
-        # 内容字体大小控制
+        params_layout.addWidget(title_font_label)
+        params_layout.addWidget(self.title_font_spin)
+        params_layout.addStretch()  # 添加弹性空间
+        
+        # 内容字号控制
         content_font_label = QLabel("内容字号：")
         self.content_font_spin = QSpinBox()
-        self.content_font_spin.setRange(24, 96)  # 内容字号范围24-96像素
-        self.content_font_spin.setValue(48)  # 默认值48
+        self.content_font_spin.setRange(24, 96)
+        self.content_font_spin.setValue(48)
         self.content_font_spin.setToolTip("调整内容文字的大小")
         
-        font_control_layout.addWidget(title_font_label)
-        font_control_layout.addWidget(self.title_font_spin)
-        font_control_layout.addWidget(content_font_label)
-        font_control_layout.addWidget(self.content_font_spin)
-        font_control_layout.addStretch()
+        params_layout.addWidget(content_font_label)
+        params_layout.addWidget(self.content_font_spin)
+        params_layout.addStretch()  # 添加弹性空间
         
-        layout.addWidget(font_control)
-
-        # 添加行间距控制
-        spacing_control = QWidget()
-        spacing_layout = QHBoxLayout(spacing_control)
-        spacing_layout.setContentsMargins(0, 0, 0, 0)
-        
+        # 行间距控制
         line_spacing_label = QLabel("行间距：")
         self.line_spacing_spin = QSpinBox()
-        self.line_spacing_spin.setRange(20, 200)  # 行间距范围20-200像素
-        self.line_spacing_spin.setValue(45)  # 默认值45
+        self.line_spacing_spin.setRange(20, 200)
+        self.line_spacing_spin.setValue(65)
         self.line_spacing_spin.setToolTip("调整行与行之间的间距")
         
-        spacing_layout.addWidget(line_spacing_label)
-        spacing_layout.addWidget(self.line_spacing_spin)
-        spacing_layout.addStretch()
+        params_layout.addWidget(line_spacing_label)
+        params_layout.addWidget(self.line_spacing_spin)
+        params_layout.addStretch()  # 添加弹性空间
         
-        layout.addWidget(spacing_control)
+        # 将参数控制面板添加到主布局
+        layout.addWidget(params_control)
 
         # 创建一个包含文本块和按钮的容器
         content_container = QWidget()
@@ -199,13 +202,11 @@ class TextEditor(QWidget):
         # 将内容容器添加到主布局
         layout.addWidget(content_container)
 
-        # 添加一个默认的文本块
-        self.add_text_block()
-
     def add_text_block(self):
         """添加新的文本块"""
         text_block = TextBlock()
         text_block.deleted.connect(self.remove_text_block)
+        text_block.type_combo.setCurrentText("内容")  # 新增的文本块默认为内容类型
         self.text_blocks.append(text_block)
         self.blocks_layout.addWidget(text_block)
         self.content_changed.emit()
