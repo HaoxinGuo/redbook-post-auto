@@ -14,8 +14,8 @@ class ImageGenerator:
     def load_fonts(self):
         fonts = {}
         fonts_dir = os.path.join('resources', 'fonts')
-        fonts['normal'] = ImageFont.truetype(os.path.join(fonts_dir, 'MSYH.TTF'), 32)
-        fonts['handwritten'] = ImageFont.truetype(os.path.join(fonts_dir, 'handwritten.ttf'), 32)
+        fonts['normal'] = ImageFont.truetype(os.path.join(fonts_dir, 'SourceHanSansSC-VF.ttf'), 32)
+        fonts['handwritten'] = ImageFont.truetype(os.path.join(fonts_dir, 'bailutongtongshouxieti.ttf'), 32)
         return fonts
         
     def create_images(self, text_content, background_path, font_style='normal'):

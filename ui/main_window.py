@@ -181,7 +181,7 @@ class MainWindow(QMainWindow):
         right_layout.addWidget(self.right_scroll)
         
         # 设置右侧预览区域的宽度范围
-        right_panel.setMinimumWidth(800)
+        right_panel.setMinimumWidth(600)
         right_panel.setMaximumWidth(1200)
         
         # 设置按钮样式
@@ -210,8 +210,8 @@ class MainWindow(QMainWindow):
         self.next_button.setStyleSheet(button_style)
         
         # 设置布局比例
-        main_layout.addWidget(left_panel, 60)
-        main_layout.addWidget(right_panel, 40)
+        main_layout.addWidget(left_panel, 70)
+        main_layout.addWidget(right_panel, 30)
         
         # 连接信号
         self.generate_button.clicked.connect(self.generate_image)
@@ -279,10 +279,10 @@ class MainWindow(QMainWindow):
                 
                 # 设置字体
                 font_size = content.get('font_size', 48)  # 使用用户设置的字号
-                font_path = os.path.join('resources', 'fonts', 'MSYH.TTF')
+                font_path = os.path.join('resources', 'fonts', 'SourceHanSansSC-VF.ttf')
                 if content.get('font_bold'):
                     # 如果需要加粗，使用粗体字体文件
-                    font_path = os.path.join('resources', 'fonts', 'normal-bold.ttf')  # 使用已有的粗体字体
+                    font_path = os.path.join('resources', 'fonts', 'SourceHanSansHWSC-Bold.otf')  # 使用已有的粗体字体
                 
                 try:
                     font = ImageFont.truetype(font_path, font_size)
