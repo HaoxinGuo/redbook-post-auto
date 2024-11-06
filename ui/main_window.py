@@ -97,91 +97,117 @@ class MainWindow(QMainWindow):
         
         # 右侧预览面板
         right_panel = QWidget()
-        right_layout = QHBoxLayout(right_panel)  # 水平布局
+        right_layout = QVBoxLayout(right_panel)  # 改为垂直布局
         right_layout.setSpacing(0)
         right_layout.setContentsMargins(0, 0, 0, 0)
         
-        # 创建导航按钮容器
-        nav_container = QWidget()
-        nav_container.setFixedWidth(60)  # 设置固定宽度
-        nav_layout = QVBoxLayout(nav_container)
-        nav_layout.setContentsMargins(10, 0, 10, 0)
-        
-        # 创建并设置导航按钮
-        self.prev_button = QPushButton()
-        self.prev_button.setFixedSize(40, 40)
-        self.prev_button.setIcon(QIcon("resources/icons/left-arrow.png"))
-        self.prev_button.setIconSize(QSize(24, 24))
-        self.prev_button.clicked.connect(self.show_previous_image)
-        self.prev_button.setEnabled(False)
-        self.prev_button.setToolTip("上一页")
-        
-        self.next_button = QPushButton()
-        self.next_button.setFixedSize(40, 40)
-        self.next_button.setIcon(QIcon("resources/icons/right-arrow.png"))
-        self.next_button.setIconSize(QSize(24, 24))
-        self.next_button.clicked.connect(self.show_next_image)
-        self.next_button.setEnabled(False)
-        self.next_button.setToolTip("下一页")
-        
-        # 将按钮添加到导航容器，并添加弹性空间使按钮垂直居中
-        nav_layout.addStretch(1)
-        nav_layout.addWidget(self.prev_button)
-        nav_layout.addSpacing(20)  # 按钮之间的间距
-        nav_layout.addWidget(self.next_button)
-        nav_layout.addStretch(1)
-        
         # 创建预览内容容器
         preview_content = QWidget()
-        preview_content_layout = QVBoxLayout(preview_content)  # 创建预览内容的布局
-        preview_content_layout.setContentsMargins(0, 0, 0, 0)
-        preview_content_layout.setSpacing(0)
+        preview_content_layout = QVBoxLayout(preview_content)
+        preview_content_layout.setContentsMargins(20, 20, 20, 20)
+        preview_content_layout.setSpacing(10)
         
-        # 创建预览内容的容器
-        preview_widget = QWidget()
-        preview_widget_layout = QVBoxLayout(preview_widget)
-        preview_widget_layout.setContentsMargins(20, 20, 20, 20)  # 设置边距
-        preview_widget_layout.setSpacing(0)
-        preview_widget_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        # 创建图片预览区域容器（用于水平居中）
+        preview_container = QWidget()
+        preview_container_layout = QHBoxLayout(preview_container)
+        preview_container_layout.setContentsMargins(0, 0, 0, 0)
+        preview_container_layout.setSpacing(0)
         
-        # 使用自定义预览标签
+        # 添加左侧弹性空间
+        preview_container_layout.addStretch(1)
+        
+        # 创建图片预览标签
         self.preview_label = PreviewLabel()
         self.preview_label.style_text_editor = self.style_text_editor
-        
-        # 预览标签
         self.preview_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.preview_label.setSizePolicy(
-            QSizePolicy.Policy.Expanding,
-            QSizePolicy.Policy.Expanding
+            QSizePolicy.Policy.Fixed,  # 改为固定宽度
+            QSizePolicy.Policy.Fixed   # 改为固定高度
         )
+        
         # 设置初始最小尺寸
         initial_width = 400
-        initial_height = int(initial_width * 4/3)  # 保持3:4比例
+        initial_height = int(initial_width * 4/3)
         self.preview_label.setMinimumSize(initial_width, initial_height)
         
-        # 将预览标签添加到预览内容容器
-        preview_widget_layout.addWidget(self.preview_label)
+        # 将预览标签添加到容器
+        preview_container_layout.addWidget(self.preview_label)
+        
+        # 添加右侧弹性空间
+        preview_container_layout.addStretch(1)
+        
+        # 添加顶部弹性空间
+        preview_content_layout.addStretch(1)
+        
+        # 添加预览容器
+        preview_content_layout.addWidget(preview_container)
+        
+        # 添加底部弹性空间
+        preview_content_layout.addStretch(1)
+        
+        # 创建导航按钮容器
+        nav_container = QWidget()
+        nav_layout = QHBoxLayout(nav_container)  # 水平布局
+        nav_layout.setContentsMargins(0, 0, 0, 0)  # 移除内边距
+        
+        # 创建并设置导航按钮
+        self.prev_button = QPushButton("上一页")
+        self.prev_button.setFixedSize(100, 40)
+        self.prev_button.clicked.connect(self.show_previous_image)
+        self.prev_button.setEnabled(False)
+        
+        self.next_button = QPushButton("下一页")
+        self.next_button.setFixedSize(100, 40)
+        self.next_button.clicked.connect(self.show_next_image)
+        self.next_button.setEnabled(False)
+        
+        # 使用两个弹性空间来实现按钮的左右对齐
+        nav_layout.addWidget(self.prev_button)
+        nav_layout.addStretch(1)  # 添加弹性空间
+        nav_layout.addWidget(self.next_button)
+        
+        # 将预览标签和导航按钮添加到预览内容布局
+        preview_content_layout.addWidget(nav_container)
         
         # 创建滚动区域
         self.right_scroll = QScrollArea()
+        self.right_scroll.setWidget(preview_content)
         self.right_scroll.setWidgetResizable(True)
         self.right_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.right_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
         self.right_scroll.setAlignment(Qt.AlignmentFlag.AlignCenter)
         
-        # 将预览内容容器设置为滚动区域的widget
-        self.right_scroll.setWidget(preview_widget)
-        
-        # 将滚动区域添加到预览内容布局
-        preview_content_layout.addWidget(self.right_scroll)
-        
-        # 将导航容器和预览内容添加到右侧面板布局
-        right_layout.addWidget(nav_container)
-        right_layout.addWidget(preview_content, 1)  # 添加拉伸因子使预览内容填充剩余空间
+        # 将滚动区域添加到右侧面板布局
+        right_layout.addWidget(self.right_scroll)
         
         # 设置右侧预览区域的宽度范围
         right_panel.setMinimumWidth(800)
         right_panel.setMaximumWidth(1200)
+        
+        # 设置按钮样式
+        button_style = """
+            QPushButton {
+                border: 1px solid #D9D9D9;
+                border-radius: 4px;
+                background-color: white;
+                padding: 8px 16px;
+                font-size: 14px;
+            }
+            QPushButton:hover {
+                background-color: #F5F5F5;
+                border-color: #4096FF;
+            }
+            QPushButton:pressed {
+                background-color: #E6E6E6;
+            }
+            QPushButton:disabled {
+                background-color: #F5F5F5;
+                border-color: #D9D9D9;
+                color: #00000040;
+            }
+        """
+        self.prev_button.setStyleSheet(button_style)
+        self.next_button.setStyleSheet(button_style)
         
         # 设置布局比例
         main_layout.addWidget(left_panel, 60)
