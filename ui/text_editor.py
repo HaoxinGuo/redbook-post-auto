@@ -29,8 +29,6 @@ class TextBlock(QWidget):
 
         # 文本编辑框
         self.editor = QTextEdit()
-        self.editor.setMinimumHeight(100)  # 增加最小高度
-        self.editor.setMaximumHeight(300)  # 增加最大高度
         # 设置文本编辑框的样式
         self.editor.setStyleSheet("""
             QTextEdit {
@@ -72,26 +70,26 @@ class TextBlock(QWidget):
     def on_type_changed(self, text):
         """根据类型调整编辑框高度"""
         if text == "标题":
-            self.editor.setMinimumHeight(80)
-            self.editor.setMaximumHeight(150)
+            self.editor.setMinimumHeight(20)  # 减小标题最小高度
+            self.editor.setMaximumHeight(50)  # 减小标题最大高度
             # 设置标题的字体大小
             self.editor.setStyleSheet("""
                 QTextEdit {
-                    padding: 10px;
-                    line-height: 1.5;
-                    font-size: 16px;
+                    padding: 8px;  # 减小内边距
+                    line-height: 1.3;  # 减小行高
+                    font-size: 48px;
                     font-weight: bold;
                 }
             """)
         else:
             self.editor.setMinimumHeight(150)
-            self.editor.setMaximumHeight(400)
+            self.editor.setMaximumHeight(300)
             # 设置内容的字体大小
             self.editor.setStyleSheet("""
                 QTextEdit {
                     padding: 10px;
                     line-height: 1.5;
-                    font-size: 14px;
+                    font-size: 12px;
                 }
             """)
 
