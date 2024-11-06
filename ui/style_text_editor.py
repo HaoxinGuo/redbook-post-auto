@@ -16,10 +16,10 @@ class StyleTextEditor(QWidget):
         self.last_selected_index = None
         self.shift_pressed = False
         self.ctrl_pressed = False
-        self.font_size = 96  # 默认字号
+        self.font_size = 90  # 默认字号
         self.font_bold = False  # 默认不加粗
-        self.current_color = '#000000'  # 椭圆默认颜色
-        self.underline_current_color = '#000000'  # 下划线默认颜色
+        self.current_color = '#ffaa7f'  # 椭圆默认颜色
+        self.underline_current_color = '#ffaa7f'  # 下划线默认颜色
         self.init_ui()
 
     def init_ui(self):
@@ -159,13 +159,13 @@ class StyleTextEditor(QWidget):
         underline_width_label = QLabel("粗细：")
         self.underline_width_spin = QSpinBox()
         self.underline_width_spin.setRange(1, 50)
-        self.underline_width_spin.setValue(2)
+        self.underline_width_spin.setValue(15)
         self.underline_width_spin.setToolTip("调整下划线的粗细")
         
         underline_offset_label = QLabel("距离：")
         self.underline_offset_spin = QSpinBox()
         self.underline_offset_spin.setRange(0, 50)
-        self.underline_offset_spin.setValue(5)
+        self.underline_offset_spin.setValue(30)
         self.underline_offset_spin.setToolTip("调整下划线与文字的距离")
         
         self.underline_color_button = QPushButton("选择颜色")
