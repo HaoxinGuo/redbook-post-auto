@@ -192,7 +192,7 @@ class MainWindow(QMainWindow):
         self.style_panel.style_changed.connect(self.preview_style_change)
         self.style_text_editor.content_changed.connect(self.on_style_text_changed)
         
-        # 接样式应用信号��生成图片方法
+        # 接样式应用信号生成图片方法
         self.style_text_editor.style_applied.connect(self.generate_image)
         
         # 设置按钮
@@ -369,6 +369,9 @@ class MainWindow(QMainWindow):
             return
             
         try:
+            # 获取当前标签页
+            current_tab = self.tabs.currentWidget()
+            
             # 选择保存目录
             directory = QFileDialog.getExistingDirectory(
                 self,
@@ -378,18 +381,52 @@ class MainWindow(QMainWindow):
             )
             
             if directory:
-                # 生成时间戳
-                timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-                
-                # 保存所有图片
-                for i, image in enumerate(self.current_images):
-                    filename = f"小红书图片_{timestamp}_第{i + 1}页.png"
+                if current_tab == self.style_text_tab:
+                    # 封面编辑模式：直接保存图片
+                    content = self.style_text_editor.text_edit.toPlainText()
+                    # 去除可能存在的非法文件名字符
+                    safe_content = "".join(c for c in content if c not in r'\/:*?"<>|')
+                    filename = f"{safe_content}_封面.png"
                     filepath = os.path.join(directory, filename)
                     
                     # 保存图片
-                    image.save(filepath, 'PNG')
+                    self.current_images[0].save(filepath, 'PNG')
+                    print(f"封面图片已保存: {filepath}")
                     
-                print(f"所有图片已保存: {directory}")
+                else:
+                    # 文本编辑模式：创建日期-标题文件夹
+                    content = self.text_editor.get_all_content()
+                    title = ""
+                    
+                    # 查找第一个标题块
+                    for item in content:
+                        if item['type'] == 'title' and item.get('text', '').strip():
+                            title = item['text'].strip()
+                            break
+                    
+                    if not title:
+                        title = "未命名"
+                    
+                    # 去除可能存在的非法文件名字符
+                    safe_title = "".join(c for c in title if c not in r'\/:*?"<>|')
+                    
+                    # 创建文件夹名称：日期-标题
+                    today = datetime.now().strftime('%Y%m%d')
+                    folder_name = f"{today}-{safe_title}"
+                    folder_path = os.path.join(directory, folder_name)
+                    
+                    # 创建文件夹
+                    os.makedirs(folder_path, exist_ok=True)
+                    
+                    # 保存所有图片
+                    for i, image in enumerate(self.current_images):
+                        filename = f"{safe_title}_{i + 1}.png"
+                        filepath = os.path.join(folder_path, filename)
+                        
+                        # 保存图片
+                        image.save(filepath, 'PNG')
+                    
+                    print(f"所有图片已保存到文件夹: {folder_path}")
             else:
                 print("未选择保存目录")
                 
