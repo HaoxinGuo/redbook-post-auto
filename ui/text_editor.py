@@ -21,6 +21,12 @@ class TextBlock(QWidget):
         self.type_combo.currentTextChanged.connect(self.on_type_changed)
         layout.addWidget(self.type_combo)
 
+        # 创建一个包含文本编辑框和删除按钮的容器
+        editor_container = QWidget()
+        editor_layout = QHBoxLayout(editor_container)
+        editor_layout.setContentsMargins(0, 0, 0, 0)
+        editor_layout.setSpacing(5)
+
         # 文本编辑框
         self.editor = QTextEdit()
         self.editor.setMinimumHeight(100)  # 增加最小高度
@@ -33,21 +39,32 @@ class TextBlock(QWidget):
                 font-size: 14px;
             }
         """)
-        layout.addWidget(self.editor)
+        editor_layout.addWidget(self.editor)
 
-        # 按钮容器
-        button_layout = QVBoxLayout()
-        button_layout.setSpacing(5)
-        
         # 删除按钮
         delete_button = QPushButton("×")
-        delete_button.setMaximumWidth(40)
-        delete_button.setMinimumHeight(40)
+        delete_button.setFixedSize(24, 24)  # 设置固定大小
         delete_button.clicked.connect(lambda: self.deleted.emit(self))
-        button_layout.addWidget(delete_button)
-        button_layout.addStretch()  # 添加弹性空间
-        
-        layout.addLayout(button_layout)
+        delete_button.setStyleSheet("""
+            QPushButton {
+                background-color: #ff4d4f;
+                color: white;
+                border: none;
+                border-radius: 12px;
+                font-size: 16px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #ff7875;
+            }
+            QPushButton:pressed {
+                background-color: #d9363e;
+            }
+        """)
+        editor_layout.addWidget(delete_button)
+
+        # 将容器添加到主布局
+        layout.addWidget(editor_container)
         
         # 初始设置高度
         self.on_type_changed(self.type_combo.currentText())
@@ -118,31 +135,12 @@ class TextEditor(QWidget):
         
         layout.addWidget(spacing_control)
 
-        # 文本编辑区域
-        self.text_blocks = []
-        self.init_text_blocks(layout)
+        # 创建一个包含文本块和按钮的容器
+        content_container = QWidget()
+        content_layout = QVBoxLayout(content_container)
+        content_layout.setContentsMargins(0, 0, 0, 0)
+        content_layout.setSpacing(10)
 
-        # 添加按钮容器
-        button_container = QWidget()
-        button_layout = QHBoxLayout(button_container)
-        button_layout.setContentsMargins(0, 0, 0, 0)
-        
-        # 添加按钮
-        add_button = QPushButton("添加文本块")
-        add_button.setMinimumHeight(40)
-        add_button.clicked.connect(self.add_text_block)
-        button_layout.addWidget(add_button)
-        
-        layout.addWidget(button_container)
-
-        # 添加一个默认的文本块
-        self.add_text_block()
-
-        # 添加弹性空间
-        layout.addStretch()
-
-    def init_text_blocks(self, layout):
-        """初始化文本块区域"""
         # 创建文本块容器
         self.blocks_container = QWidget()
         self.blocks_layout = QVBoxLayout(self.blocks_container)
@@ -156,8 +154,28 @@ class TextEditor(QWidget):
         scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
         
-        # 添加到主布局
-        layout.addWidget(scroll)
+        # 添加滚动区域到内容容器
+        content_layout.addWidget(scroll)
+
+        # 添加按钮容器
+        button_container = QWidget()
+        button_layout = QHBoxLayout(button_container)
+        button_layout.setContentsMargins(0, 0, 0, 0)
+        
+        # 添加按钮
+        add_button = QPushButton("添加文本块")
+        add_button.setMinimumHeight(40)
+        add_button.clicked.connect(self.add_text_block)
+        button_layout.addWidget(add_button)
+        
+        # 将按钮容器添加到内容容器
+        content_layout.addWidget(button_container)
+
+        # 将内容容器添加到主布局
+        layout.addWidget(content_container)
+
+        # 添加一个默认的文本块
+        self.add_text_block()
 
     def add_text_block(self):
         """添加新的文本块"""
