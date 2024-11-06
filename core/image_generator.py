@@ -21,143 +21,220 @@ class ImageGenerator:
     def create_images(self, text_content, background_path, font_style='normal'):
         """生成多页图片"""
         images = []
+        remaining_content = text_content.copy()
+        current_page_content = []
         current_y = self.margin
-        current_content = []
-        remaining_text = None  # 存储未完成的文本内容
-        current_type = None   # 存储当前处理的内容类型
         
-        print(f"\n开始处理文本内容，总内容块数: {len(text_content)}")
+        print("\n=== 开始生成图片 ===")
+        print(f"总内容块数: {len(text_content)}")
         
-        i = 0
-        while i < len(text_content):
-            item = text_content[i]
-            print(f"\n处理第 {i+1} 个内容块:")
+        while remaining_content:
+            print(f"\n--- 处理新页面 ---")
+            print(f"当前Y位置: {current_y}")
+            print(f"剩余内容块数: {len(remaining_content)}")
+            
+            # 获取下一个内容块
+            item = remaining_content[0]
+            print(f"\n处理内容块:")
             print(f"类型: {item['type']}")
             print(f"内容长度: {len(item.get('text', ''))}")
+            print(f"内容: {item.get('text', '')[:50]}...")
             
-            # 跳过空内容
             if not item.get('text', '').strip():
                 print("跳过空内容块")
-                i += 1
+                remaining_content.pop(0)
                 continue
             
-            # 如果有未完成的文本，创建新的内容项
-            if remaining_text:
-                print(f"处理剩余文本，长度: {len(remaining_text)}")
-                item = {
-                    'type': current_type or 'content',  # 使用保存的类型
-                    'text': remaining_text.strip()
-                }
-                print(f"剩余文本类型: {item['type']}")
-                remaining_text = None
-                if not item['text']:
-                    print("剩余文本为空，跳过")
-                    i += 1
-                    continue
+            # 计算当前内容块所需的高度
+            if item['type'] == 'title':
+                font_size = 48
+                line_spacing = item.get('line_spacing', 60)
+                print(f"标题字体大小: {font_size}, 行间距: {line_spacing}")
             else:
-                # 保存当前内容的类型
-                current_type = item['type']
+                font_size = 32
+                line_spacing = item.get('line_spacing', 45)
+                print(f"正文字体大小: {font_size}, 行间距: {line_spacing}")
             
-            # 计算当前内容块所需高度
-            content_height = self.calculate_content_height(item, self.fonts[font_style])
-            print(f"当前内容块高度: {content_height}, 当前Y位置: {current_y}")
+            try:
+                current_font = ImageFont.truetype(self.fonts[font_style].path, font_size)
+                print("字体加载成功")
+            except Exception as e:
+                print(f"字体加载失败: {str(e)}")
+                remaining_content.pop(0)
+                continue
             
-            # 如果是标题且当前页面已经有内容，创建新页面
-            if item['type'] == 'title' and current_content and current_y > self.margin:
-                print("遇到新标题，创建新页面")
-                if current_content:
-                    images.append(self.create_single_image(current_content, background_path, font_style))
-                    print(f"创建新页面，当前总页数: {len(images)}")
-                    current_content = []
-                    current_y = self.margin
+            # 获取换行后的文本
+            lines = self.get_wrapped_text(item['text'], current_font, self.width - (self.margin * 2))
+            content_height = len(lines) * line_spacing + line_spacing // 2
+            print(f"内容分行数: {len(lines)}")
+            print(f"内容需要高度: {content_height}")
+            print(f"当前页面剩余高度: {self.height - current_y - self.margin}")
             
-            # 如果内容会超出页面
+            # 检查是否需要分页
             if current_y + content_height > self.height - self.margin:
-                print(f"内容超出页面: 需要 {current_y + content_height}, 最大高度 {self.height - self.margin}")
-                if current_content:
-                    remaining_height = self.height - self.margin - current_y
-                    lines_per_page = self.calculate_lines_per_height(remaining_height, item['type'])
-                    print(f"当前页剩余高度: {remaining_height}, 可容纳行数: {lines_per_page}")
-                    
-                    if lines_per_page > 0:
-                        first_part, second_part = self.split_text_by_lines(
-                            item['text'], 
-                            self.fonts[font_style], 
-                            lines_per_page,
-                            item['type']
-                        )
-                        print(f"文本分割结果: 第一部分长度 {len(first_part) if first_part else 0}, "
-                              f"第二部分长度 {len(second_part) if second_part else 0}")
-                        
-                        if first_part and first_part.strip():
-                            current_content.append({
-                                'type': item['type'],  # 保持原始类型
-                                'text': first_part
-                            })
-                            print(f"添加第一部分到当前页面，类型: {item['type']}")
-                    
-                    if current_content:
-                        images.append(self.create_single_image(current_content, background_path, font_style))
-                        print(f"创建新页面，当前总页数: {len(images)}")
-                    
-                    current_content = []
-                    current_y = self.margin
-                    
-                    if second_part and second_part.strip():
-                        remaining_text = second_part
-                        # 不改变索引，继续处理剩余文本
-                        print(f"保存第二部分作为剩余文本度: {len(second_part)}")
-                        continue
-                else:
-                    print("当前页面为空，强制分割内容")
-                    lines_per_page = self.calculate_lines_per_height(
-                        self.height - self.margin * 2, 
-                        item['type']
-                    )
-                    first_part, second_part = self.split_text_by_lines(
-                        item['text'],
-                        self.fonts[font_style],
-                        lines_per_page,
-                        item['type']
-                    )
-                    
-                    if first_part and first_part.strip():
-                        current_content.append({
-                            'type': item['type'],  # 保持原始类型
-                            'text': first_part
-                        })
-                        images.append(self.create_single_image(current_content, background_path, font_style))
-                        print(f"创建新页面，当前总页数: {len(images)}")
-                        current_content = []
-                        current_y = self.margin
-                    
-                    if second_part and second_part.strip():
-                        remaining_text = second_part
-                        # 不改变索引，继续处理剩余文本
-                        print(f"保存第二部分作为剩余文本，长度: {len(second_part)}")
-                        continue
+                print("\n内容超出当前页面")
                 
-                if not remaining_text:
-                    print("无剩余文本，移动到下一个内容块")
-                    i += 1
-                    continue
+                # 计算当前页面剩余可用行数
+                available_height = self.height - current_y - self.margin
+                max_lines = available_height // line_spacing
+                print(f"当前页面可容纳行数: {max_lines}")
+                
+                if max_lines > 0 and (not current_page_content or item['type'] != 'title'):
+                    # 分割内容
+                    first_part = {
+                        'type': item['type'],
+                        'text': '\n'.join(lines[:max_lines]),
+                        'line_spacing': line_spacing
+                    }
+                    second_part = {
+                        'type': item['type'],
+                        'text': '\n'.join(lines[max_lines:]),
+                        'line_spacing': line_spacing
+                    }
+                    
+                    print(f"分割为两部分:")
+                    print(f"第一部分长度: {len(first_part['text'])}")
+                    print(f"第二部分长度: {len(second_part['text'])}")
+                    
+                    if first_part['text'].strip():
+                        current_page_content.append(first_part)
+                        print("添加第一部分到当前页面")
+                    
+                    if second_part['text'].strip():
+                        remaining_content[0] = second_part
+                        print("保存第二部分到剩余内容")
+                    else:
+                        remaining_content.pop(0)
+                
+                # 创建当前页面
+                if current_page_content:
+                    image = Image.new('RGB', (self.width, self.height), 'white')
+                    if background_path:
+                        try:
+                            bg = Image.open(background_path)
+                            bg = bg.resize((self.width, self.height))
+                            image.paste(bg, (0, 0))
+                            print("背景加载成功")
+                        except Exception as e:
+                            print(f"背景加载失败: {str(e)}")
+                    
+                    draw = ImageDraw.Draw(image)
+                    print("开始渲染当前页面内容")
+                    self.render_text(draw, current_page_content, self.fonts[font_style])
+                    images.append(image)
+                    print(f"页面完成，当前总页数: {len(images)}")
+                    
+                    # 重置当前页面
+                    current_page_content = []
+                    current_y = self.margin
+                    print("重置页面状态")
+                
+                continue
             
-            # 正常添加内容
-            current_content.append(item)
+            # 添加内容到当前页面
+            print("\n添加内容到当前页面")
+            current_page_content.append(item)
             current_y += content_height
-            print(f"添加内容到当前页面，更新Y位置: {current_y}")
-            
-            # 只有在没有剩余文本时才增加索引
-            if not remaining_text:
-                i += 1
+            remaining_content.pop(0)
+            print(f"当前页面内容块数: {len(current_page_content)}")
+            print(f"更新后的Y位置: {current_y}")
         
         # 处理最后一页
-        if current_content and any(item.get('text', '').strip() for item in current_content):
-            images.append(self.create_single_image(current_content, background_path, font_style))
-            print(f"添加最后一页，最终总页数: {len(images)}")
+        if current_page_content:
+            print("\n处理最后一页")
+            print(f"最后一页内容块数: {len(current_page_content)}")
+            image = Image.new('RGB', (self.width, self.height), 'white')
+            if background_path:
+                try:
+                    bg = Image.open(background_path)
+                    bg = bg.resize((self.width, self.height))
+                    image.paste(bg, (0, 0))
+                    print("背景加载成功")
+                except Exception as e:
+                    print(f"背景加载失败: {str(e)}")
+            
+            draw = ImageDraw.Draw(image)
+            self.render_text(draw, current_page_content, self.fonts[font_style])
+            images.append(image)
+            print(f"最后一页完成，最终总页数: {len(images)}")
         
-        print(f"\n处理完成，共生成 {len(images)} 页图片")
+        print("\n=== 图片生成完成 ===")
+        print(f"总页数: {len(images)}")
         return images
+    
+    def calculate_content_height(self, content_items, font):
+        """计算内容块的总高度"""
+        total_height = 0
+        for item in content_items:
+            if not item.get('text', '').strip():
+                continue
+                
+            if item['type'] == 'title':
+                font_size = 48
+                line_spacing = item.get('line_spacing', 60)
+            else:
+                font_size = 32
+                line_spacing = item.get('line_spacing', 45)
+            
+            try:
+                current_font = ImageFont.truetype(font.path, font_size)
+            except Exception as e:
+                print(f"调整字体大小失败: {str(e)}")
+                continue
+            
+            # 获取换行后的文本
+            lines = self.get_wrapped_text(item['text'], current_font, self.width - (self.margin * 2))
+            
+            # 计算此内容块的高度
+            block_height = len(lines) * line_spacing
+            block_height += line_spacing // 2  # 添加块间距
+            
+            total_height += block_height
+        
+        return total_height
+    
+    def split_content_block(self, content_block, font, available_height):
+        """将内容块分成两部分，以适应可用高度"""
+        if not content_block.get('text', '').strip():
+            return None, None
+            
+        if content_block['type'] == 'title':
+            font_size = 48
+            line_spacing = content_block.get('line_spacing', 60)
+        else:
+            font_size = 32
+            line_spacing = content_block.get('line_spacing', 45)
+        
+        try:
+            current_font = ImageFont.truetype(font.path, font_size)
+        except Exception as e:
+            print(f"调整字体大小失败: {str(e)}")
+            return None, None
+        
+        # 获取换行后的文本
+        lines = self.get_wrapped_text(content_block['text'], current_font, self.width - (self.margin * 2))
+        
+        # 计算可以放入当前页面的行数
+        max_lines = int(available_height / line_spacing)
+        
+        if max_lines <= 0:
+            return None, content_block
+        
+        if max_lines >= len(lines):
+            return content_block, None
+        
+        # 分割文本
+        first_part_text = '\n'.join(lines[:max_lines])
+        second_part_text = '\n'.join(lines[max_lines:])
+        
+        # 创建两个新的内容块
+        first_part = dict(content_block)
+        first_part['text'] = first_part_text
+        
+        second_part = dict(content_block)
+        second_part['text'] = second_part_text
+        
+        return first_part, second_part
     
     def calculate_lines_per_height(self, height, content_type):
         """计算指定高度可以容纳多少行文本"""
@@ -195,7 +272,7 @@ class ImageGenerator:
         first_part_lines = lines[:max_lines]
         second_part_lines = lines[max_lines:]
         
-        # 重新组合文本，确保去除首尾空白
+        # 重组合文本，确保去除首尾空白
         first_part = '\n'.join(first_part_lines).strip()
         second_part = '\n'.join(second_part_lines).strip()
         
@@ -232,37 +309,6 @@ class ImageGenerator:
         
         return image
     
-    def calculate_content_height(self, item, font):
-        """计算容块所需的高度"""
-        if not item.get('text', '').strip():
-            return 0
-            
-        # 设置字体大小
-        if item['type'] == 'title':
-            font_size = 48
-            line_spacing = 60
-        else:
-            font_size = 32
-            line_spacing = 45
-            
-        try:
-            current_font = ImageFont.truetype(font.path, font_size)
-        except Exception as e:
-            print(f"调整字体大小失败: {str(e)}")
-            return 0
-            
-        # 获取换行后的文本
-        max_width = self.width - (self.margin * 2)
-        lines = self.get_wrapped_text(item['text'], current_font, max_width)
-        
-        # 计算总高度
-        total_height = len(lines) * line_spacing
-        
-        # 添加段落间距
-        total_height += line_spacing // 2
-        
-        return total_height
-
     def process_list_text(self, text):
         """处理文本中的列表"""
         lines = text.split('\n')
@@ -484,12 +530,12 @@ class ImageGenerator:
             # 设置不同类型文本的字体大小和样式
             if item['type'] == 'title':
                 font_size = 48
-                line_spacing = 60
+                line_spacing = item.get('line_spacing', 60)  # 使用自定义行间距，默认60
                 alignment = 'center'
             else:
                 font_size = 32
-                line_spacing = 45
-                alignment = 'left'  # 非标题内容左对齐
+                line_spacing = item.get('line_spacing', 45)  # 使用自定义行间距，默认45
+                alignment = 'left'
             
             try:
                 current_font = ImageFont.truetype(font.path, font_size)
@@ -499,7 +545,7 @@ class ImageGenerator:
             
             # 获取换行后的文本
             lines = self.get_wrapped_text(item['text'], current_font, max_width)
-            print(f"文本分行数: {len(lines)}")
+            print(f"文本行数: {len(lines)}")
             
             # 计算此内容块的总高度
             total_height = len(lines) * line_spacing
@@ -507,8 +553,8 @@ class ImageGenerator:
             
             # 检查是否会超出页面底部
             if current_y + total_height > self.height - self.margin:
-                print(f"警告：内容超出页面底部，跳过渲染。需要高度: {current_y + total_height}, 最大高度: {self.height - self.margin}")
-                break
+                print(f"警告：内容超出页面底部，需要分页。需要高度: {current_y + total_height}, 最大高度: {self.height - self.margin}")
+                return False  # 返回False表示需要分页
             
             # 渲染每一行
             for line_num, line in enumerate(lines):
@@ -539,13 +585,15 @@ class ImageGenerator:
             # 在不同文本块之间添加额外的间距
             current_y += line_spacing // 2
             print(f"添加额外间距，Y位置更新到: {current_y}")
+        
+        return True  # 返回True表示渲染成功
 
     def draw_styled_text(self, draw, text, marks, x, y, font, char_spacing=0, line_spacing=20):
         """绘制带样式的文本"""
         char_width = font.getlength("测")  # 使用一个汉字宽度作为参考
         line_height = font.size + line_spacing  # 行高等于字体大小加行间距
         
-        # 计算每行最大宽度（考虑左右边距）
+        # 计算每行最大宽度（考虑右边距）
         max_width = self.width - (self.margin * 2)
         
         # 分行处理文本

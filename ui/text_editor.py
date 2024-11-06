@@ -1,5 +1,5 @@
 from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QTextEdit, QPushButton, 
-                           QHBoxLayout, QComboBox, QLabel)
+                           QHBoxLayout, QComboBox, QLabel, QSpinBox, QScrollArea)
 from PyQt6.QtCore import Qt, pyqtSignal
 
 class TextBlock(QWidget):
@@ -97,10 +97,31 @@ class TextEditor(QWidget):
         self.init_ui()
 
     def init_ui(self):
-        self.layout = QVBoxLayout(self)
-        self.layout.setSpacing(15)  # 增加文本块之间的间距
-        self.layout.setContentsMargins(10, 10, 10, 10)  # 设置边距
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(10)
+
+        # 添加行间距控制
+        spacing_control = QWidget()
+        spacing_layout = QHBoxLayout(spacing_control)
+        spacing_layout.setContentsMargins(0, 0, 0, 0)
         
+        line_spacing_label = QLabel("行间距：")
+        self.line_spacing_spin = QSpinBox()
+        self.line_spacing_spin.setRange(20, 200)  # 行间距范围20-200像素
+        self.line_spacing_spin.setValue(45)  # 默认值45
+        self.line_spacing_spin.setToolTip("调整行与行之间的间距")
+        
+        spacing_layout.addWidget(line_spacing_label)
+        spacing_layout.addWidget(self.line_spacing_spin)
+        spacing_layout.addStretch()
+        
+        layout.addWidget(spacing_control)
+
+        # 文本编辑区域
+        self.text_blocks = []
+        self.init_text_blocks(layout)
+
         # 添加按钮容器
         button_container = QWidget()
         button_layout = QHBoxLayout(button_container)
@@ -108,24 +129,42 @@ class TextEditor(QWidget):
         
         # 添加按钮
         add_button = QPushButton("添加文本块")
-        add_button.setMinimumHeight(40)  # 增加按钮高度
+        add_button.setMinimumHeight(40)
         add_button.clicked.connect(self.add_text_block)
         button_layout.addWidget(add_button)
         
-        self.layout.addWidget(button_container)
+        layout.addWidget(button_container)
 
         # 添加一个默认的文本块
         self.add_text_block()
 
         # 添加弹性空间
-        self.layout.addStretch()
+        layout.addStretch()
+
+    def init_text_blocks(self, layout):
+        """初始化文本块区域"""
+        # 创建文本块容器
+        self.blocks_container = QWidget()
+        self.blocks_layout = QVBoxLayout(self.blocks_container)
+        self.blocks_layout.setContentsMargins(0, 0, 0, 0)
+        self.blocks_layout.setSpacing(10)
+        
+        # 创建滚动区域
+        scroll = QScrollArea()
+        scroll.setWidget(self.blocks_container)
+        scroll.setWidgetResizable(True)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        
+        # 添加到主布局
+        layout.addWidget(scroll)
 
     def add_text_block(self):
+        """添加新的文本块"""
         text_block = TextBlock()
         text_block.deleted.connect(self.remove_text_block)
         self.text_blocks.append(text_block)
-        # 在弹性空间之前插入新的文本块
-        self.layout.insertWidget(len(self.text_blocks), text_block)
+        self.blocks_layout.addWidget(text_block)
         self.content_changed.emit()
 
     def remove_text_block(self, block):
@@ -135,7 +174,12 @@ class TextEditor(QWidget):
             self.content_changed.emit()
 
     def get_all_content(self):
-        return [block.get_content() for block in self.text_blocks]
+        """获取所有内容，包括行间距设置"""
+        content = [block.get_content() for block in self.text_blocks]
+        # 添加行间距信息
+        for item in content:
+            item['line_spacing'] = self.line_spacing_spin.value()
+        return content
 
     def set_all_content(self, content_list):
         # 清除现有的文本块
@@ -149,7 +193,7 @@ class TextEditor(QWidget):
             text_block.set_content(content)
             text_block.deleted.connect(self.remove_text_block)
             self.text_blocks.append(text_block)
-            self.layout.insertWidget(len(self.text_blocks), text_block)
+            self.blocks_layout.addWidget(text_block)
 
         # 如果没有内容，添加一个默认的文本块
         if not content_list:
