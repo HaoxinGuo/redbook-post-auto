@@ -16,7 +16,7 @@ class StyleTextEditor(QWidget):
         self.last_selected_index = None
         self.shift_pressed = False
         self.ctrl_pressed = False
-        self.font_size = 48  # 默认字号
+        self.font_size = 96  # 默认字号
         self.font_bold = False  # 默认不加粗
         self.current_color = '#000000'  # 椭圆默认颜色
         self.underline_current_color = '#000000'  # 下划线默认颜色
@@ -202,14 +202,14 @@ class StyleTextEditor(QWidget):
         char_spacing_label = QLabel("字间距：")
         self.char_spacing_spin = QSpinBox()
         self.char_spacing_spin.setRange(0, 100)  # 字间距范围0-100像素
-        self.char_spacing_spin.setValue(0)
+        self.char_spacing_spin.setValue(40)
         self.char_spacing_spin.setToolTip("调整字符之间的间距")
         
         # 行间距控制
         line_spacing_label = QLabel("行间距：")
         self.line_spacing_spin = QSpinBox()
         self.line_spacing_spin.setRange(0, 200)  # 行间距范围0-200像素
-        self.line_spacing_spin.setValue(20)
+        self.line_spacing_spin.setValue(50)
         self.line_spacing_spin.setToolTip("调整行与行之间的间距")
         
         spacing_layout.addWidget(char_spacing_label)
