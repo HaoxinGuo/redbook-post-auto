@@ -106,7 +106,7 @@ class ImageGenerator:
                     if second_part and second_part.strip():
                         remaining_text = second_part
                         # 不改变索引，继续处理剩余文本
-                        print(f"保存第二部分作为剩余文本，长度: {len(second_part)}")
+                        print(f"保存第二部分作为剩余文本度: {len(second_part)}")
                         continue
                 else:
                     print("当前页面为空，强制分割内容")
@@ -127,7 +127,7 @@ class ImageGenerator:
                             'text': first_part
                         })
                         images.append(self.create_single_image(current_content, background_path, font_style))
-                        print(f"创建新页面，当前总���数: {len(images)}")
+                        print(f"创建新页面，当前总页数: {len(images)}")
                         current_content = []
                         current_y = self.margin
                     
@@ -327,7 +327,7 @@ class ImageGenerator:
                 
                 # 如果是新的缩进级别或新的列表开始
                 if indent_level not in current_list_number:
-                    # 保存起始��
+                    # 保存起始编号
                     if marker.isalpha():
                         start_num = ord(marker.lower()) - ord('a') + 1
                     else:
@@ -539,3 +539,113 @@ class ImageGenerator:
             # 在不同文本块之间添加额外的间距
             current_y += line_spacing // 2
             print(f"添加额外间距，Y位置更新到: {current_y}")
+
+    def draw_styled_text(self, draw, text, marks, x, y, font, char_spacing=0, line_spacing=20):
+        """绘制带样式的文本"""
+        char_width = font.getlength("测")  # 使用一个汉字宽度作为参考
+        line_height = font.size + line_spacing  # 行高等于字体大小加行间距
+        
+        # 计算每行最大宽度（考虑左右边距）
+        max_width = self.width - (self.margin * 2)
+        
+        # 分行处理文本
+        lines = []
+        current_line = []
+        current_width = 0
+        
+        # 从左边距开始
+        x = self.margin
+        
+        for i, char in enumerate(text):
+            if char.strip():
+                char_full_width = char_width + char_spacing
+                # 检查是否需要换行
+                if current_width + char_full_width > max_width:
+                    # 当前行已满，开始新行
+                    if current_line:  # 确保当前行有内容
+                        lines.append((current_line, current_width))
+                        current_line = []
+                        current_width = 0
+                # 添加字符到当前行
+                current_line.append((i, char))
+                current_width += char_full_width
+        
+        # 添加最后一行
+        if current_line:
+            lines.append((current_line, current_width))
+        
+        # 计算总高度，确保文本垂直居中
+        total_height = len(lines) * line_height
+        start_y = (self.height - total_height) // 2
+        
+        # 先绘制椭圆（确保在文字下面）
+        for (start, end), style in marks.items():
+            if style['type'] == 'ellipse':
+                # 找到起始和结束字符的位置
+                start_line = -1
+                end_line = -1
+                start_x = 0
+                end_x = 0
+                
+                for line_idx, (line_chars, _) in enumerate(lines):
+                    for char_idx, (text_idx, _) in enumerate(line_chars):
+                        if text_idx == start:
+                            start_line = line_idx
+                            start_x = x + char_idx * (char_width + char_spacing)
+                        if text_idx == end:
+                            end_line = line_idx
+                            end_x = x + (char_idx + 1) * (char_width + char_spacing)
+                
+                if start_line == end_line:  # 同一行
+                    ellipse_y = start_y + start_line * line_height
+                    draw.ellipse([
+                        start_x - style.get('size', 10),
+                        ellipse_y - style.get('size', 10) + style.get('position', 0),
+                        end_x + style.get('size', 10),
+                        ellipse_y + font.size + style.get('size', 10) + style.get('position', 0)
+                    ], outline=style.get('color', '#000000'), width=style.get('width', 2))
+        
+        # 绘制文字和其他样式
+        for line_idx, (line_chars, line_width) in enumerate(lines):
+            current_y = start_y + line_idx * line_height
+            
+            # 收集每行的下划线信息
+            underlines = []
+            current_underline = None
+            
+            for char_idx, (text_idx, char) in enumerate(line_chars):
+                current_x = x + char_idx * (char_width + char_spacing)
+                
+                # 检查下划线样式
+                for (start, end), style in marks.items():
+                    if style['type'] == 'underline' and start <= text_idx <= end:
+                        if current_underline is None:
+                            current_underline = {
+                                'start_x': current_x,
+                                'color': style.get('color', '#000000'),
+                                'width': style.get('width', 2),
+                                'offset': style.get('offset', 5)
+                            }
+                        current_underline['end_x'] = current_x + char_width
+                        break
+                else:
+                    if current_underline is not None:
+                        underlines.append(current_underline)
+                        current_underline = None
+                
+                # 绘制文字
+                draw.text((current_x, current_y), char, font=font, fill='black')
+            
+            # 添加最后一个下划线
+            if current_underline is not None:
+                underlines.append(current_underline)
+            
+            # 绘制该行的所有下划线
+            for underline in underlines:
+                line_y = current_y + font.size + underline['offset']
+                draw.line(
+                    [(underline['start_x'], line_y), 
+                     (underline['end_x'], line_y)],
+                    fill=underline['color'],
+                    width=underline['width']
+                )

@@ -2,8 +2,8 @@ from PyQt6.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
                            QTabWidget, QTextEdit, QPushButton, QComboBox, 
                            QRadioButton, QLabel, QScrollArea, QFileDialog, 
                            QSizePolicy, QFrame)
-from PyQt6.QtCore import Qt, QSize
-from PyQt6.QtGui import QPixmap, QResizeEvent, QIcon
+from PyQt6.QtCore import Qt, QSize, QPoint
+from PyQt6.QtGui import QPixmap, QResizeEvent, QIcon, QPainter, QPen, QColor
 from .text_editor import TextEditor
 from .style_panel import StylePanel
 from core.image_generator import ImageGenerator
@@ -15,6 +15,9 @@ from datetime import datetime
 from .styles import FusionStyle
 from PIL import Image
 from PyQt6.QtCore import QTimer
+from .style_text_editor import StyleTextEditor
+from PIL import ImageDraw
+from PIL import ImageFont
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -26,7 +29,7 @@ class MainWindow(QMainWindow):
         self.current_image_index = 0
         self.init_ui()
         
-        # 在显示窗口之前先计算一次预览尺寸
+        # 在显示窗口之先计算一次预览尺寸
         self.calculate_initial_preview_size()
         
         # 初始化时显示默认背景
@@ -45,7 +48,7 @@ class MainWindow(QMainWindow):
         left_layout = QVBoxLayout(left_panel)
         
         # 创建标签页
-        tabs = QTabWidget()
+        self.tabs = QTabWidget()
         
         # 手动录入标签页
         manual_tab = QWidget()
@@ -55,7 +58,7 @@ class MainWindow(QMainWindow):
         manual_tab.setLayout(manual_layout)
         
         # 添加标签页（只添加手动录入）
-        tabs.addTab(manual_tab, "文本编辑")
+        self.tabs.addTab(manual_tab, "文本编辑")
         
         # 样式面板
         self.style_panel = StylePanel()
@@ -78,9 +81,19 @@ class MainWindow(QMainWindow):
         button_layout.addWidget(self.generate_button)
         button_layout.addWidget(self.download_button)
         
-        left_layout.addWidget(tabs)
+        left_layout.addWidget(self.tabs)
         left_layout.addWidget(self.style_panel)
         left_layout.addWidget(button_container)  # 添加按钮容器
+        
+        # 样式文本编辑标签页
+        self.style_text_tab = QWidget()
+        style_text_layout = QVBoxLayout(self.style_text_tab)
+        self.style_text_editor = StyleTextEditor()
+        style_text_layout.addWidget(self.style_text_editor)
+        self.style_text_tab.setLayout(style_text_layout)
+        
+        # 添加样式文本编辑标签页
+        self.tabs.addTab(self.style_text_tab, "封面编辑")
         
         # 右侧预览面板
         right_panel = QWidget()
@@ -131,8 +144,11 @@ class MainWindow(QMainWindow):
         preview_widget_layout.setSpacing(0)
         preview_widget_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
         
+        # 使用自定义预览标签
+        self.preview_label = PreviewLabel()
+        self.preview_label.style_text_editor = self.style_text_editor
+        
         # 预览标签
-        self.preview_label = QLabel()
         self.preview_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.preview_label.setSizePolicy(
             QSizePolicy.Policy.Expanding,
@@ -174,8 +190,12 @@ class MainWindow(QMainWindow):
         # 连接信号
         self.generate_button.clicked.connect(self.generate_image)
         self.style_panel.style_changed.connect(self.preview_style_change)
+        self.style_text_editor.content_changed.connect(self.on_style_text_changed)
         
-        # 设置按钮样式
+        # 接样式应用信号��生成图片方法
+        self.style_text_editor.style_applied.connect(self.generate_image)
+        
+        # 设置按钮
         self.generate_button.setObjectName("primaryButton")
         self.download_button.setObjectName("primaryButton")
         
@@ -205,19 +225,76 @@ class MainWindow(QMainWindow):
     def generate_image(self):
         try:
             style = self.style_panel.get_current_style()
-            content = self.text_editor.get_all_content()
-            
             bg_value = style['background']
             bg_config = next((bg for bg in self.style_panel.config['backgrounds'] 
                             if bg['value'] == bg_value), None)
             bg_path = bg_config['url'] if bg_config else None
+
+            # 获取当前激活的标签页
+            current_tab = self.tabs.currentWidget()
             
-            # 生成多页图片
-            self.current_images = self.image_generator.create_images(
-                content,
-                bg_path,
-                style['font_style']
-            )
+            if current_tab == self.style_text_tab:
+                # 处理封面编辑的内容
+                content = self.style_text_editor.get_content()
+                # 创建单页图片
+                image = Image.new('RGB', (self.image_generator.width, self.image_generator.height), 'white')
+                
+                # 加载背景
+                if bg_path:
+                    try:
+                        bg = Image.open(bg_path)
+                        bg = bg.resize((self.image_generator.width, self.image_generator.height))
+                        image.paste(bg, (0, 0))
+                    except Exception as e:
+                        print(f"加载背景图片失败: {str(e)}")
+                
+                # 创建绘图对象
+                draw = ImageDraw.Draw(image)
+                
+                # 设置字体
+                font_size = content.get('font_size', 48)  # 使用用户设置的字号
+                font_path = os.path.join('resources', 'fonts', 'MSYH.TTF')
+                if content.get('font_bold'):
+                    # 如果需要加粗，使用粗体字体文件
+                    font_path = os.path.join('resources', 'fonts', 'normal-bold.ttf')  # 使用已有的粗体字体
+                
+                try:
+                    font = ImageFont.truetype(font_path, font_size)
+                except Exception as e:
+                    print(f"加载字体失败: {str(e)}")
+                    return
+                
+                # 计算文本位置（居中）
+                text = content['text']
+                text_width = font.getlength(text)
+                x = (self.image_generator.width - text_width) // 2
+                y = (self.image_generator.height - font_size) // 2
+                
+                # 使用 draw_styled_text 绘制带样式的文本
+                self.image_generator.draw_styled_text(
+                    draw, 
+                    text, 
+                    content['marks'],
+                    x, 
+                    y, 
+                    font,
+                    char_spacing=content.get('char_spacing', 0),
+                    line_spacing=content.get('line_spacing', 20)
+                )
+                
+                self.current_images = [image]
+                
+                # 更新预览标签中的椭圆标记
+                self.preview_label.update_ellipse_marks(content['marks'])
+            
+            else:
+                # 处理普通文本编辑的内容
+                content = self.text_editor.get_all_content()
+                self.current_images = self.image_generator.create_images(
+                    content,
+                    bg_path,
+                    style['font_style']
+                )
             
             # 重置图片索引并显示第一页
             self.current_image_index = 0
@@ -232,7 +309,7 @@ class MainWindow(QMainWindow):
             print(f"生成了 {len(self.current_images)} 张图片")
             
         except Exception as e:
-            print(f"生成图片错误: {str(e)}")  # 打印具体错误信息
+            print(f"生成图片错误: {str(e)}")
             self.preview_label.setText("生成图片失败")
             self.download_button.setEnabled(False)
             self.prev_button.setEnabled(False)
@@ -312,7 +389,7 @@ class MainWindow(QMainWindow):
                     # 保存图片
                     image.save(filepath, 'PNG')
                     
-                print(f"所有图片已保存到: {directory}")
+                print(f"所有图片已保存: {directory}")
             else:
                 print("未选择保存目录")
                 
@@ -377,7 +454,7 @@ class MainWindow(QMainWindow):
         available_width = max(400, available_width)
         available_height = max(533, available_height)
         
-        # 计算保持宽高比的最大尺寸
+        # 计算持宽高比的最大尺寸
         image_ratio = 3/4  # 图片的宽高比
         
         # 计算基于宽度和高度的可能尺寸
@@ -417,7 +494,7 @@ class MainWindow(QMainWindow):
                             if bg['value'] == bg_value), None)
             
             if bg_config and bg_config['url']:
-                # 加载背景图片
+                # 加背景图片
                 pixmap = QPixmap(bg_config['url'])
                 
                 # 获取预览标签的大小
@@ -439,3 +516,293 @@ class MainWindow(QMainWindow):
         except Exception as e:
             print(f"背景预览错误: {str(e)}")
             self.preview_label.clear()
+    
+    def on_style_text_changed(self):
+        """当样式文本编辑器的内容改变时"""
+        # 移除自动生成图片的逻辑，只在点击生成按钮时生成
+        pass
+
+class PreviewLabel(QLabel):
+    """自定义预览标签，支持椭圆调整"""
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setMouseTracking(True)
+        self.dragging = False
+        self.resizing = False
+        self.adjusting_width = False
+        self.drag_start = QPoint()
+        self.current_ellipse = None
+        self.current_underline = None
+        self.ellipse_marks = []
+        self.underline_marks = []
+        self.style_text_editor = None
+        self.scale_factor = 1.0
+
+    def update_scale_factor(self):
+        """更新缩放比例"""
+        if not self.pixmap():
+            return
+        # 计算预览图片相对于原始图片的缩放比例
+        self.scale_factor = self.pixmap().width() / 1080  # 1080是原始图片宽度
+
+    def setPixmap(self, pixmap):
+        """重写setPixmap方法以更新缩放比例"""
+        super().setPixmap(pixmap)
+        self.update_scale_factor()
+
+    def get_real_coordinates(self, pos):
+        """将预览坐标转换为实际图片坐标"""
+        if not self.pixmap():
+            return pos
+        # 获取图片在标签中的实际位置
+        x_offset = (self.width() - self.pixmap().width()) // 2
+        y_offset = (self.height() - self.pixmap().height()) // 2
+        # 转换坐标
+        real_x = (pos.x() - x_offset) / self.scale_factor
+        real_y = (pos.y() - y_offset) / self.scale_factor
+        return QPoint(int(real_x), int(real_y))
+
+    def get_preview_coordinates(self, real_pos):
+        """将实际图片坐标转换为预览坐标"""
+        if not self.pixmap():
+            return real_pos
+        x_offset = (self.width() - self.pixmap().width()) // 2
+        y_offset = (self.height() - self.pixmap().height()) // 2
+        preview_x = real_pos.x() * self.scale_factor + x_offset
+        preview_y = real_pos.y() * self.scale_factor + y_offset
+        return QPoint(int(preview_x), int(preview_y))
+
+    def is_on_ellipse_edge(self, pos, ellipse):
+        """检查点是否在椭圆边缘"""
+        real_pos = self.get_real_coordinates(pos)
+        
+        # 算椭圆的边界框
+        char_width = 32 * self.scale_factor  # 考虑缩放因子
+        text_x = (self.width() - len(self.style_text_editor.text_edit.toPlainText()) * char_width) // 2
+        x1 = text_x + ellipse['start'] * char_width - ellipse['size'] * self.scale_factor
+        x2 = text_x + (ellipse['end'] + 1) * char_width + ellipse['size'] * self.scale_factor
+        y1 = self.height() // 2 - 24 * self.scale_factor - ellipse['size'] * self.scale_factor + ellipse['position'] * self.scale_factor
+        y2 = self.height() // 2 + 24 * self.scale_factor + ellipse['size'] * self.scale_factor + ellipse['position'] * self.scale_factor
+        
+        # 检查是否在边缘区域（边缘区域定义为距离边框5像素以内）
+        edge_threshold = 5 * self.scale_factor
+        x, y = pos.x(), pos.y()
+        
+        # 简化的椭圆边缘检测
+        if (abs(x - x1) <= edge_threshold or abs(x - x2) <= edge_threshold) and y1 <= y <= y2:
+            return True
+        if (abs(y - y1) <= edge_threshold or abs(y - y2) <= edge_threshold) and x1 <= x <= x2:
+            return True
+        return False
+
+    def is_on_ellipse_border(self, pos, ellipse):
+        """检查点是否在椭圆边框上"""
+        real_pos = self.get_real_coordinates(pos)
+        
+        # 计算椭圆的边界框
+        char_width = 32 * self.scale_factor
+        text_x = (self.width() - len(self.style_text_editor.text_edit.toPlainText()) * char_width) // 2
+        x1 = text_x + ellipse['start'] * char_width - ellipse['size'] * self.scale_factor
+        x2 = text_x + (ellipse['end'] + 1) * char_width + ellipse['size'] * self.scale_factor
+        y1 = self.height() // 2 - 24 * self.scale_factor - ellipse['size'] * self.scale_factor + ellipse['position'] * self.scale_factor
+        y2 = self.height() // 2 + 24 * self.scale_factor + ellipse['size'] * self.scale_factor + ellipse['position'] * self.scale_factor
+        
+        # 检查是否在边框上（边框区域定义为距离边框2像素以内）
+        border_threshold = 2 * self.scale_factor
+        x, y = pos.x(), pos.y()
+        
+        # 简化的边框检测
+        if (abs(x - x1) <= border_threshold or abs(x - x2) <= border_threshold) and y1 <= y <= y2:
+            return True
+        if (abs(y - y1) <= border_threshold or abs(y - y2) <= border_threshold) and x1 <= x <= x2:
+            return True
+        return False
+
+    def is_inside_ellipse(self, pos, ellipse):
+        """检查点是否在椭圆内部"""
+        real_pos = self.get_real_coordinates(pos)
+        
+        # 计算椭圆的边界框
+        char_width = 32 * self.scale_factor
+        text_x = (self.width() - len(self.style_text_editor.text_edit.toPlainText()) * char_width) // 2
+        x1 = text_x + ellipse['start'] * char_width - ellipse['size'] * self.scale_factor
+        x2 = text_x + (ellipse['end'] + 1) * char_width + ellipse['size'] * self.scale_factor
+        y1 = self.height() // 2 - 24 * self.scale_factor - ellipse['size'] * self.scale_factor + ellipse['position'] * self.scale_factor
+        y2 = self.height() // 2 + 24 * self.scale_factor + ellipse['size'] * self.scale_factor + ellipse['position'] * self.scale_factor
+        
+        # 检查是否在圆内部
+        x, y = pos.x(), pos.y()
+        return x1 <= x <= x2 and y1 <= y <= y2
+
+    def is_on_underline(self, pos, underline):
+        """检查点是否在下划线上"""
+        real_pos = self.get_real_coordinates(pos)
+        
+        # 计算下划线的位置
+        char_width = 32 * self.scale_factor
+        text_x = (self.width() - len(self.style_text_editor.text_edit.toPlainText()) * char_width) // 2
+        x1 = text_x + underline['start'] * char_width
+        x2 = text_x + (underline['end'] + 1) * char_width
+        y = self.height() // 2 + 24 * self.scale_factor + underline['offset'] * self.scale_factor
+        
+        # 检查是否在下划线区域内（考虑线条宽度）
+        threshold = max(5, underline['width']) * self.scale_factor
+        x, pos_y = pos.x(), pos.y()
+        return x1 <= x <= x2 and abs(y - pos_y) <= threshold
+
+    def mousePressEvent(self, event):
+        if event.button() == Qt.MouseButton.LeftButton:
+            # 先检查椭圆
+            for ellipse in self.ellipse_marks:
+                if self.is_on_ellipse_edge(event.pos(), ellipse):
+                    self.resizing = True
+                    self.current_ellipse = ellipse
+                    self.current_underline = None
+                    self.drag_start = event.pos()
+                    self.select_text_range(ellipse['start'], ellipse['end'])
+                    return
+                elif self.is_on_ellipse_border(event.pos(), ellipse):
+                    self.adjusting_width = True
+                    self.current_ellipse = ellipse
+                    self.current_underline = None
+                    self.drag_start = event.pos()
+                    self.select_text_range(ellipse['start'], ellipse['end'])
+                    return
+                elif self.is_inside_ellipse(event.pos(), ellipse):
+                    self.dragging = True
+                    self.current_ellipse = ellipse
+                    self.current_underline = None
+                    self.drag_start = event.pos()
+                    self.select_text_range(ellipse['start'], ellipse['end'])
+                    return
+
+            # 再检查下划线
+            for underline in self.underline_marks:
+                if self.is_on_underline(event.pos(), underline):
+                    self.current_underline = underline
+                    self.current_ellipse = None
+                    self.drag_start = event.pos()
+                    self.select_text_range(underline['start'], underline['end'])
+                    return
+
+    def select_text_range(self, start, end):
+        """在文本编辑器中选中指定范围的文本"""
+        if self.style_text_editor:
+            cursor = self.style_text_editor.text_edit.textCursor()
+            cursor.setPosition(start)
+            cursor.setPosition(end + 1, QTextCursor.MoveMode.KeepAnchor)
+            self.style_text_editor.text_edit.setTextCursor(cursor)
+
+    def mouseMoveEvent(self, event):
+        if self.dragging and self.current_ellipse:
+            # 移动椭圆
+            current_pos = self.get_real_coordinates(event.pos())
+            start_pos = self.get_real_coordinates(self.drag_start)
+            delta = current_pos.y() - start_pos.y()
+            self.current_ellipse['position'] = max(-20, min(20, 
+                self.current_ellipse['position'] + int(delta / self.scale_factor)))
+            self.drag_start = event.pos()
+            self.update_style_editor()
+        elif self.resizing and self.current_ellipse:
+            # 调整椭圆大小
+            current_pos = self.get_real_coordinates(event.pos())
+            start_pos = self.get_real_coordinates(self.drag_start)
+            delta = current_pos.x() - start_pos.x()
+            self.current_ellipse['size'] = max(5, min(30, 
+                self.current_ellipse['size'] + int(delta / self.scale_factor)))
+            self.drag_start = event.pos()
+            self.update_style_editor()
+        elif self.adjusting_width and self.current_ellipse:
+            # 调整线条粗细
+            current_pos = self.get_real_coordinates(event.pos())
+            start_pos = self.get_real_coordinates(self.drag_start)
+            delta = current_pos.y() - start_pos.y()
+            new_width = self.current_ellipse['width'] + int(delta / (5 * self.scale_factor))
+            self.current_ellipse['width'] = max(1, min(50, new_width))
+            self.drag_start = event.pos()
+            self.update_style_editor()
+        else:
+            # 更新鼠标样式
+            cursor = Qt.CursorShape.ArrowCursor
+            for ellipse in self.ellipse_marks:
+                if self.is_on_ellipse_edge(event.pos(), ellipse):
+                    cursor = Qt.CursorShape.SizeHorCursor
+                    break
+                elif self.is_on_ellipse_border(event.pos(), ellipse):
+                    cursor = Qt.CursorShape.SizeVerCursor
+                    break
+                elif self.is_inside_ellipse(event.pos(), ellipse):
+                    cursor = Qt.CursorShape.SizeAllCursor
+                    break
+            
+            # 检查下划线
+            for underline in self.underline_marks:
+                if self.is_on_underline(event.pos(), underline):
+                    cursor = Qt.CursorShape.PointingHandCursor
+                    break
+                    
+            self.setCursor(cursor)
+
+        super().mouseMoveEvent(event)
+
+    def mouseReleaseEvent(self, event):
+        self.dragging = False
+        self.resizing = False
+        self.adjusting_width = False
+        self.current_ellipse = None
+        self.current_underline = None
+
+    def update_style_editor(self):
+        """更新StyleTextEditor中的控制值和标记"""
+        if self.style_text_editor and self.current_ellipse:
+            # 更新控制面板的值
+            self.style_text_editor.position_spin.blockSignals(True)
+            self.style_text_editor.size_spin.blockSignals(True)
+            self.style_text_editor.width_spin.blockSignals(True)
+            
+            self.style_text_editor.position_spin.setValue(self.current_ellipse['position'])
+            self.style_text_editor.size_spin.setValue(self.current_ellipse['size'])
+            self.style_text_editor.width_spin.setValue(self.current_ellipse['width'])
+            
+            self.style_text_editor.position_spin.blockSignals(False)
+            self.style_text_editor.size_spin.blockSignals(False)
+            self.style_text_editor.width_spin.blockSignals(False)
+            
+            # 更新StyleTextEditor中的标记数据
+            for (start, end), style in self.style_text_editor.text_marks.items():
+                if (start == self.current_ellipse['start'] and 
+                    end == self.current_ellipse['end'] and 
+                    style['type'] == 'ellipse'):
+                    # 更新现有标记的属性
+                    style.update({
+                        'position': self.current_ellipse['position'],
+                        'size': self.current_ellipse['size'],
+                        'width': self.current_ellipse['width']
+                    })
+                    break
+            
+            # 触发重新生成图片
+            self.style_text_editor.style_applied.emit()
+
+    def update_ellipse_marks(self, marks):
+        """更新椭圆和下划线标记信息"""
+        self.ellipse_marks = []
+        self.underline_marks = []
+        for (start, end), style in marks.items():
+            if style['type'] == 'ellipse':
+                self.ellipse_marks.append({
+                    'start': start,
+                    'end': end,
+                    'position': style.get('position', 0),
+                    'size': style.get('size', 10),
+                    'width': style.get('width', 2),
+                    'color': style.get('color', '#000000')
+                })
+            elif style['type'] == 'underline':
+                self.underline_marks.append({
+                    'start': start,
+                    'end': end,
+                    'width': style.get('width', 2),
+                    'offset': style.get('offset', 5),
+                    'color': style.get('color', '#000000')
+                })
