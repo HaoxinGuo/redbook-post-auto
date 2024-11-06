@@ -17,8 +17,8 @@
         }
     ],
     "fonts": {
-        "normal": "resources/fonts/normal.ttf",
-        "handwritten": "resources/fonts/handwritten.ttf"
+        "normal": "resources/fonts/SourceHanSansSC-VF.ttf",
+        "handwritten": "resources/fonts/bailutongtongshouxieti.ttf"
     },
     "api": {
         "url": "https://open.bigmodel.cn/api/paas/v4/chat/completions",

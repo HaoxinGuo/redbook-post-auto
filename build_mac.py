@@ -8,13 +8,23 @@ if not os.path.exists('dist/resources'):
 
 # 复制资源文件
 resource_files = [
-    ('resources/fonts/SourceHanSansSC-VF.ttf', 'resources/fonts/'),
-    ('resources/fonts/SourceHanSansHWSC-Bold.otf', 'resources/fonts/'),  # 添加粗体字体
-    ('resources/fonts/MSYH.TTF', 'resources/fonts/'),
-    ('resources/backgrounds/grid.png', 'resources/backgrounds/'),
-    ('resources/backgrounds/dot.png', 'resources/backgrounds/'),
-    ('resources/backgrounds/blank.png', 'resources/backgrounds/'),
-    ('resources/icon.png', 'resources/'),  # 添加图标文件
+    # 字体文件
+    ('resources/fonts/MSYH.TTF', 'resources/fonts/'),  # 微软雅黑字体
+    ('resources/fonts/SourceHanSansSC-VF.ttf', 'resources/fonts/'),  # 思源黑体
+    ('resources/fonts/SourceHanSansHWSC-Bold.otf', 'resources/fonts/'),  # 思源黑体粗体
+    
+    # 背景图片
+    ('resources/backgrounds/grid.png', 'resources/backgrounds/'),  # 网格背景
+    ('resources/backgrounds/memo.png', 'resources/backgrounds/'),  # 小红书背景
+    ('resources/backgrounds/new.png', 'resources/backgrounds/'),  # 新背景
+    ('resources/backgrounds/blank.png', 'resources/backgrounds/'),  # 空白背景
+    
+    # 图标文件
+    ('resources/icon.png', 'resources/'),  # 应用图标
+    ('resources/icons/app_icon.icns', 'resources/icons/'),  # Mac图标
+    
+    # 配置文件
+    ('resources/config.json', 'resources/'),  # 配置文件
 ]
 
 # 复制所有资源文件

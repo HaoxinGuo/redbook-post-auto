@@ -14,8 +14,7 @@ class ImageGenerator:
     def load_fonts(self):
         fonts = {}
         fonts_dir = os.path.join('resources', 'fonts')
-        fonts['normal'] = ImageFont.truetype(os.path.join(fonts_dir, 'SourceHanSansSC-VF.ttf'), 32)
-        fonts['handwritten'] = ImageFont.truetype(os.path.join(fonts_dir, 'bailutongtongshouxieti.ttf'), 32)
+        fonts['normal'] = ImageFont.truetype(os.path.join(fonts_dir, 'MSYH.TTF'), 32)
         return fonts
         
     def create_images(self, text_content, background_path, font_style='normal'):
@@ -446,7 +445,7 @@ class ImageGenerator:
                 # 计算缩进和标记的宽度
                 indent_marker_width = font.getlength(indent + marker)
                 
-                # 计算第一行可用宽度（减去缩进和标记的宽度）
+                # 计算第一行可用宽���（减去缩进和标记的宽度）
                 first_line_width = max_width - indent_marker_width
                 
                 # 处理第一行
@@ -685,7 +684,7 @@ class ImageGenerator:
         for line_idx, (line_chars, line_width) in enumerate(lines):
             current_y = start_y + line_idx * line_height
             
-            # 收集每行的下划线信息
+            # 收集每行的下划线��息
             underlines = []
             current_underline = None
             
