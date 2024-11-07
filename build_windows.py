@@ -10,10 +10,6 @@ def check_resource_exists(path):
         return False
     return True
 
-# 确保资源目录存在
-if not os.path.exists('dist/resources'):
-    os.makedirs('dist/resources')
-
 # 定义资源文件列表
 resource_files = [
     # 字体文件
@@ -55,19 +51,7 @@ if missing_files:
     print("└── icon.png")
     sys.exit(1)
 
-# 复制所有资源文件
-try:
-    for src, dst in resource_files:
-        dst_dir = os.path.join('dist', dst)
-        if not os.path.exists(dst_dir):
-            os.makedirs(dst_dir)
-        print(f"复制文件: {src} -> {os.path.join('dist', dst)}")
-        shutil.copy2(src, os.path.join('dist', dst))
-except Exception as e:
-    print(f"复制资源文件时出错: {str(e)}")
-    sys.exit(1)
-
-print("资源文件复制完成，开始打包...")
+print("开始打包...")
 
 # 运行PyInstaller
 try:
@@ -76,7 +60,7 @@ try:
         '--name=小红书文字转图片工具',
         '--windowed',
         '--icon=resources/icons/app_icon.ico',
-        '--add-data=resources;resources',
+        '--add-data=resources;resources',  # 确保资源文件被包含
         '--hidden-import=PyQt6.QtCore',
         '--hidden-import=PyQt6.QtGui',
         '--hidden-import=PyQt6.QtWidgets',
@@ -86,7 +70,48 @@ try:
         '--clean',
         '--noconfirm',
     ])
-    print("打包完成!")
+    print("PyInstaller 打包完成!")
+
+    # 获取目标目录路径
+    dist_dir = os.path.join("dist", "小红书文字转图片工具")
+    
+    # 确保目标目录存在
+    if not os.path.exists(dist_dir):
+        print(f"错误: 找不到生成的应用程序目录 {dist_dir}")
+        sys.exit(1)
+
+    print("\n开始复制资源文件...")
+    
+    # 复制资源文件到目标目录
+    for src, dst in resource_files:
+        dst_dir = os.path.join(dist_dir, dst)
+        # 确保目标目录存在
+        if not os.path.exists(dst_dir):
+            os.makedirs(dst_dir)
+        dst_path = os.path.join(dst_dir, os.path.basename(src))
+        print(f"复制: {src} -> {dst_path}")
+        try:
+            shutil.copy2(src, dst_path)
+        except Exception as e:
+            print(f"复制文件失败 {src}: {str(e)}")
+            sys.exit(1)
+
+    print("资源文件复制完成!")
+
+    # 创建发布目录
+    release_dir = "release"
+    if not os.path.exists(release_dir):
+        os.makedirs(release_dir)
+
+    # 复制整个dist目录到发布目录
+    release_path = os.path.join(release_dir, "小红书文字转图片工具")
+    if os.path.exists(release_path):
+        shutil.rmtree(release_path)
+    shutil.copytree(dist_dir, release_path)
+    print(f"\n应用程序已复制到: {release_path}")
+
 except Exception as e:
     print(f"打包过程出错: {str(e)}")
-    sys.exit(1) 
+    sys.exit(1)
+
+print("\n打包完成! 生成的文件在 release 目录中")
