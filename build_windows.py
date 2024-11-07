@@ -75,7 +75,6 @@ try:
         'main.py',
         '--name=小红书文字转图片工具',
         '--windowed',
-        '--onefile',
         '--icon=resources/icons/app_icon.ico',
         '--add-data=resources;resources',
         '--hidden-import=PyQt6.QtCore',
@@ -83,6 +82,7 @@ try:
         '--hidden-import=PyQt6.QtWidgets',
         '--hidden-import=ui.styles',
         '--hidden-import=ui.style_text_editor',
+        '--hidden-import=PIL',
         '--clean',
         '--noconfirm',
     ])
