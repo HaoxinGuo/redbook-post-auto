@@ -18,6 +18,7 @@ from PyQt6.QtCore import QTimer
 from .style_text_editor import StyleTextEditor
 from PIL import ImageDraw
 from PIL import ImageFont
+from ui.styles import *  # 或者具体的样式导入
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -34,6 +35,9 @@ class MainWindow(QMainWindow):
         
         # 初始化时显示默认背景
         self.preview_background()
+        
+        # 应用样式到具体的控件
+        #self.setStyleSheet(your_style_definition)  # your_style_definition 来自 styles.py
         
     def init_ui(self):
         # 创建中心部件
