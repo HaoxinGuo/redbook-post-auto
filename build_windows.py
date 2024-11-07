@@ -78,6 +78,12 @@ try:
         '--onefile',
         '--icon=resources/icons/app_icon.ico',
         '--add-data=resources;resources',
+        '--hidden-import=PyQt6.QtCore',
+        '--hidden-import=PyQt6.QtGui',
+        '--hidden-import=PyQt6.QtWidgets',
+        '--hidden-import=ui.styles',
+        '--hidden-import=ui.style_text_editor',
+        '--clean',
         '--noconfirm',
     ])
     print("打包完成!")
