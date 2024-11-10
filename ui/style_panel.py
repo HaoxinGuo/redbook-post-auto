@@ -3,6 +3,7 @@ from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel,
 from PyQt6.QtCore import pyqtSignal
 import json
 import os
+import sys
 
 class StylePanel(QWidget):
     style_changed = pyqtSignal(dict)  # 样式变化信号
@@ -14,19 +15,34 @@ class StylePanel(QWidget):
 
     def load_config(self):
         """加载配置文件"""
-        config_path = os.path.join('resources', 'config.json')
         try:
+            # 获取正确的配置文件路径
+            if hasattr(sys, '_MEIPASS'):
+                config_path = os.path.join(sys._MEIPASS, 'resources', 'config.json')
+            else:
+                config_path = os.path.join('resources', 'config.json')
+                
+            print(f"尝试加载配置文件: {config_path}")
+            
+            if not os.path.exists(config_path):
+                print(f"配置文件不存在: {config_path}")
+                return self.get_default_config()
+                
             with open(config_path, 'r', encoding='utf-8') as f:
-                return json.load(f)
+                config = json.load(f)
+                
+                # 修正背景图片路径
+                if hasattr(sys, '_MEIPASS'):
+                    for bg in config['backgrounds']:
+                        if bg['url']:
+                            # 将相对路径转换为绝对路径
+                            bg['url'] = os.path.join(sys._MEIPASS, bg['url'])
+                            
+                print("配置文件加载成功")
+                return config
         except Exception as e:
-            print(f"加载配置文件失败: {e}")
-            return {
-                "backgrounds": [],
-                "fonts": {
-                    "normal": "",
-                    "handwritten": ""
-                }
-            }
+            print(f"加载配置文件失败: {str(e)}")
+            return self.get_default_config()
 
     def init_ui(self):
         layout = QVBoxLayout(self)

@@ -19,9 +19,5 @@
     "fonts": {
         "normal": "resources/fonts/SourceHanSansSC-VF.ttf",
         "handwritten": "resources/fonts/bailutongtongshouxieti.ttf"
-    },
-    "api": {
-        "url": "https://open.bigmodel.cn/api/paas/v4/chat/completions",
-        "key": "你的API密钥"
     }
 } 

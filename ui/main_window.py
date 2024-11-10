@@ -19,6 +19,7 @@ from .style_text_editor import StyleTextEditor
 from PIL import ImageDraw
 from PIL import ImageFont
 from ui.styles import *  # 或者具体的样式导入
+import sys
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -275,6 +276,7 @@ class MainWindow(QMainWindow):
                         bg = Image.open(bg_path)
                         bg = bg.resize((self.image_generator.width, self.image_generator.height))
                         image.paste(bg, (0, 0))
+                        print("背景加载成功")
                     except Exception as e:
                         print(f"加载背景图片失败: {str(e)}")
                 
@@ -283,30 +285,32 @@ class MainWindow(QMainWindow):
                 
                 # 设置字体
                 font_size = content.get('font_size', 48)  # 使用用户设置的字号
-                font_path = os.path.join('resources', 'fonts', 'SourceHanSansSC-VF.ttf')
+                if hasattr(sys, '_MEIPASS'):
+                    font_path = os.path.join(sys._MEIPASS, 'resources', 'fonts', 'SourceHanSansSC-VF.ttf')
+                else:
+                    font_path = os.path.join('resources', 'fonts', 'SourceHanSansSC-VF.ttf')
+
                 if content.get('font_bold'):
                     # 如果需要加粗，使用粗体字体文件
-                    font_path = os.path.join('resources', 'fonts', 'SourceHanSansHWSC-Bold.otf')  # 使用已有的粗体字体
+                    if hasattr(sys, '_MEIPASS'):
+                        font_path = os.path.join(sys._MEIPASS, 'resources', 'fonts', 'SourceHanSansHWSC-Bold.otf')
+                    else:
+                        font_path = os.path.join('resources', 'fonts', 'SourceHanSansHWSC-Bold.otf')
                 
                 try:
                     font = ImageFont.truetype(font_path, font_size)
+                    print(f"字体加载成功: {font_path}")
                 except Exception as e:
                     print(f"加载字体失败: {str(e)}")
                     return
                 
-                # 计算文本位置（居中）
-                text = content['text']
-                text_width = font.getlength(text)
-                x = (self.image_generator.width - text_width) // 2
-                y = (self.image_generator.height - font_size) // 2
-                
                 # 使用 draw_styled_text 绘制带样式的文本
                 self.image_generator.draw_styled_text(
                     draw, 
-                    text, 
+                    content['text'], 
                     content['marks'],
-                    x, 
-                    y, 
+                    0, 
+                    0, 
                     font,
                     char_spacing=content.get('char_spacing', 0),
                     line_spacing=content.get('line_spacing', 20)
@@ -340,6 +344,8 @@ class MainWindow(QMainWindow):
             
         except Exception as e:
             print(f"生成图片错误: {str(e)}")
+            import traceback
+            traceback.print_exc()
             self.preview_label.setText("生成图片失败")
             self.download_button.setEnabled(False)
             self.prev_button.setEnabled(False)
@@ -348,30 +354,46 @@ class MainWindow(QMainWindow):
     def update_preview(self):
         """更新预览图片"""
         if not self.current_images or self.current_image_index >= len(self.current_images):
+            print("没有可预览的图片")
             return
             
-        # 保存临时文件并显示
-        temp_path = 'temp_preview.png'
-        self.current_images[self.current_image_index].save(temp_path)
-        
-        # 加载图片
-        pixmap = QPixmap(temp_path)
-        
-        # 获取预览标签的大小
-        label_size = self.preview_label.size()
-        
-        # 缩放图片以填充预览标签，保持宽高比
-        scaled_pixmap = pixmap.scaled(
-            label_size,
-            Qt.AspectRatioMode.KeepAspectRatio,
-            Qt.TransformationMode.SmoothTransformation
-        )
-        
-        # 显示图片
-        self.preview_label.setPixmap(scaled_pixmap)
-        
-        # 清理临时文件
-        os.remove(temp_path)
+        try:
+            # 保存临时文件并显示
+            temp_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'temp_preview.png')
+            self.current_images[self.current_image_index].save(temp_path)
+            print(f"临时预览文件保存到: {temp_path}")
+            
+            # 加载图片
+            pixmap = QPixmap(temp_path)
+            if pixmap.isNull():
+                print("预览图片加载失败")
+                return
+                
+            # 获取预览标签的大小
+            label_size = self.preview_label.size()
+            
+            # 缩放图片以填充预览标签，保持宽高比
+            scaled_pixmap = pixmap.scaled(
+                label_size,
+                Qt.AspectRatioMode.KeepAspectRatio,
+                Qt.TransformationMode.SmoothTransformation
+            )
+            
+            # 显示图片
+            self.preview_label.setPixmap(scaled_pixmap)
+            print("预览图片更新成功")
+            
+            # 清理临时文件
+            try:
+                os.remove(temp_path)
+                print("临时预览文件已清理")
+            except Exception as e:
+                print(f"清理临时文件失败: {str(e)}")
+                
+        except Exception as e:
+            print(f"更新预览失败: {str(e)}")
+            import traceback
+            traceback.print_exc()
     
     def show_previous_image(self):
         """显示上一页"""
@@ -412,7 +434,7 @@ class MainWindow(QMainWindow):
             
             if directory:
                 if current_tab == self.style_text_tab:
-                    # 封面编辑模式：直接保存图片
+                    # 封编辑模式：直接保存图片
                     content = self.style_text_editor.text_edit.toPlainText()
                     # 去除可能存在的非法文件名字符
                     safe_content = "".join(c for c in content if c not in r'\/:*?"<>|')
@@ -466,7 +488,7 @@ class MainWindow(QMainWindow):
     def preview_style_change(self, style):
         """当样式改变时更新预览"""
         if self.current_images:
-            # 如果已经生成了图片，则重新生成
+            # 如果已经生成了图片，则新生成
             self.generate_image()
         else:
             # 如果还没有生成图片，只预览背景
@@ -561,9 +583,22 @@ class MainWindow(QMainWindow):
                             if bg['value'] == bg_value), None)
             
             if bg_config and bg_config['url']:
-                # 加背景图片
-                pixmap = QPixmap(bg_config['url'])
-                
+                # bg_config['url'] 现在应该已经是完整路径
+                bg_path = bg_config['url']
+                print(f"加载背景图片: {bg_path}")
+                    
+                if not os.path.exists(bg_path):
+                    print(f"背景图片不存在: {bg_path}")
+                    self.preview_label.clear()
+                    return
+                    
+                # 加载背景图片
+                pixmap = QPixmap(bg_path)
+                if pixmap.isNull():
+                    print("背景图片加载失败")
+                    self.preview_label.clear()
+                    return
+                    
                 # 获取预览标签的大小
                 label_size = self.preview_label.size()
                 
@@ -576,12 +611,15 @@ class MainWindow(QMainWindow):
                 
                 # 显示预览
                 self.preview_label.setPixmap(scaled_pixmap)
+                print("背景图片加载成功")
             else:
                 # 如果没有背景配置，显示空白
                 self.preview_label.clear()
                 
         except Exception as e:
             print(f"背景预览错误: {str(e)}")
+            import traceback
+            traceback.print_exc()
             self.preview_label.clear()
     
     def on_style_text_changed(self):

@@ -2,6 +2,7 @@ from PIL import Image, ImageDraw, ImageFont
 import os
 import textwrap
 import re
+import sys
 
 class ImageGenerator:
     def __init__(self):
@@ -12,10 +13,30 @@ class ImageGenerator:
         self.list_indent = 30  # 列表缩进
         
     def load_fonts(self):
+        """加载字体"""
         fonts = {}
-        fonts_dir = os.path.join('resources', 'fonts')
-        fonts['normal'] = ImageFont.truetype(os.path.join(fonts_dir, 'MSYH.TTF'), 32)
-        return fonts
+        try:
+            # 获取资源路径
+            if hasattr(sys, '_MEIPASS'):
+                # 如果是打包后的应用
+                base_path = sys._MEIPASS
+            else:
+                # 如果是开发环境
+                base_path = os.path.abspath('.')
+            
+            fonts_dir = os.path.join(base_path, 'resources', 'fonts')
+            font_path = os.path.join(fonts_dir, 'MSYH.TTF')
+            
+            if not os.path.exists(font_path):
+                print(f"Font file not found at: {font_path}")
+                raise FileNotFoundError(f"Font file not found: {font_path}")
+                
+            fonts['normal'] = ImageFont.truetype(font_path, 32)
+            return fonts
+        except Exception as e:
+            print(f"Error loading fonts: {str(e)}")
+            # 返回一个空字典，让应用程序可以继续运行
+            return {}
         
     def create_images(self, text_content, background_path, font_style='normal'):
         """生成多页图片"""
@@ -445,7 +466,7 @@ class ImageGenerator:
                 # 计算缩进和标记的宽度
                 indent_marker_width = font.getlength(indent + marker)
                 
-                # 计算第一行可用宽���（减去缩进和标记的宽度）
+                # 计算第一行可用宽度（减去缩进和标记的宽度）
                 first_line_width = max_width - indent_marker_width
                 
                 # 处理第一行
@@ -684,7 +705,7 @@ class ImageGenerator:
         for line_idx, (line_chars, line_width) in enumerate(lines):
             current_y = start_y + line_idx * line_height
             
-            # 收集每行的下划线��息
+            # 收集每行的下划线息
             underlines = []
             current_underline = None
             
