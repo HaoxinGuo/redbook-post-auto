@@ -20,6 +20,8 @@ from PIL import ImageDraw
 from PIL import ImageFont
 from ui.styles import *  # 或者具体的样式导入
 import sys
+import tempfile
+import time
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -255,20 +257,25 @@ class MainWindow(QMainWindow):
     
     def generate_image(self):
         try:
+            print("\n=== 开始生成图片 ===")
             style = self.style_panel.get_current_style()
             bg_value = style['background']
             bg_config = next((bg for bg in self.style_panel.config['backgrounds'] 
                             if bg['value'] == bg_value), None)
             bg_path = bg_config['url'] if bg_config else None
-
+            
+            print(f"背景路径: {bg_path}")
+            
             # 获取当前激活的标签页
             current_tab = self.tabs.currentWidget()
+            print(f"当前标签页类型: {type(current_tab)}")
             
             if current_tab == self.style_text_tab:
-                # 处理封面编辑的内容
+                print("处理封面编辑内容")
                 content = self.style_text_editor.get_content()
                 # 创建单页图片
                 image = Image.new('RGB', (self.image_generator.width, self.image_generator.height), 'white')
+                print("创建新图片")
                 
                 # 加载背景
                 if bg_path:
@@ -282,29 +289,28 @@ class MainWindow(QMainWindow):
                 
                 # 创建绘图对象
                 draw = ImageDraw.Draw(image)
+                print("创建绘图对象")
                 
                 # 设置字体
-                font_size = content.get('font_size', 48)  # 使用用户设置的字号
+                font_size = content.get('font_size', 48)
+                print(f"字体大小: {font_size}")
+                
                 if hasattr(sys, '_MEIPASS'):
                     font_path = os.path.join(sys._MEIPASS, 'resources', 'fonts', 'SourceHanSansSC-VF.ttf')
                 else:
                     font_path = os.path.join('resources', 'fonts', 'SourceHanSansSC-VF.ttf')
-
-                if content.get('font_bold'):
-                    # 如果需要加粗，使用粗体字体文件
-                    if hasattr(sys, '_MEIPASS'):
-                        font_path = os.path.join(sys._MEIPASS, 'resources', 'fonts', 'SourceHanSansHWSC-Bold.otf')
-                    else:
-                        font_path = os.path.join('resources', 'fonts', 'SourceHanSansHWSC-Bold.otf')
+                
+                print(f"字体路径: {font_path}")
                 
                 try:
                     font = ImageFont.truetype(font_path, font_size)
-                    print(f"字体加载成功: {font_path}")
+                    print("字体加载成功")
                 except Exception as e:
                     print(f"加载字体失败: {str(e)}")
                     return
                 
-                # 使用 draw_styled_text 绘制带样式的文本
+                # 绘制文本
+                print("开始绘制文本")
                 self.image_generator.draw_styled_text(
                     draw, 
                     content['text'], 
@@ -315,14 +321,13 @@ class MainWindow(QMainWindow):
                     char_spacing=content.get('char_spacing', 0),
                     line_spacing=content.get('line_spacing', 20)
                 )
+                print("文本绘制完成")
                 
                 self.current_images = [image]
+                print("图片生成完成")
                 
-                # 更新预览标签中的椭圆标记
-                self.preview_label.update_ellipse_marks(content['marks'])
-            
             else:
-                # 处理普通文本编辑的内容
+                print("处理普通文本编辑内容")
                 content = self.text_editor.get_all_content()
                 self.current_images = self.image_generator.create_images(
                     content,
@@ -330,17 +335,18 @@ class MainWindow(QMainWindow):
                     style['font_style']
                 )
             
-            # 重置图片索引并显示第一页
+            # 更新预览
             self.current_image_index = 0
+            print("开始更新预览")
             self.update_preview()
+            print("预览更新完成")
             
-            # 更新导航按钮状态
+            # 更新按钮状态
             self.update_navigation_buttons()
-            
-            # 启用下载按钮
             self.download_button.setEnabled(True)
             
             print(f"生成了 {len(self.current_images)} 张图片")
+            print("=== 图片生成完成 ===\n")
             
         except Exception as e:
             print(f"生成图片错误: {str(e)}")
@@ -358,15 +364,27 @@ class MainWindow(QMainWindow):
             return
             
         try:
-            # 保存临时文件并显示
-            temp_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'temp_preview.png')
-            self.current_images[self.current_image_index].save(temp_path)
-            print(f"临时预览文件保存到: {temp_path}")
+            # 在系统临时目录创建临时文件
+            import tempfile
+            with tempfile.NamedTemporaryFile(suffix='.png', delete=False) as temp_file:
+                temp_path = temp_file.name
+                
+            print(f"使用临时文件路径: {temp_path}")
+            
+            # 保存图片到临时文件
+            self.current_images[self.current_image_index].save(temp_path, 'PNG')
+            print(f"图片已保存到临时文件")
+            
+            # 强制刷新文件到磁盘
+            import time
+            time.sleep(0.1)  # 给文件系统一点时间
             
             # 加载图片
             pixmap = QPixmap(temp_path)
             if pixmap.isNull():
                 print("预览图片加载失败")
+                print(f"检查临时文件是否存在: {os.path.exists(temp_path)}")
+                print(f"临时文件大小: {os.path.getsize(temp_path) if os.path.exists(temp_path) else 'file not found'}")
                 return
                 
             # 获取预览标签的大小
@@ -550,7 +568,7 @@ class MainWindow(QMainWindow):
         width_based_height = available_width * image_ratio
         height_based_width = available_height / image_ratio
         
-        # 选择较小的尺寸以确保完全可见
+        # ���择较小的尺寸以确保完全可见
         if width_based_height <= available_height:
             # 以宽度为基准
             preview_width = available_width
