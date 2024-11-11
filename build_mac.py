@@ -30,10 +30,10 @@ def build_mac_app():
     # PyInstaller 参数
     pyinstaller_args = [
         'main.py',  # 主程序文件
-        '--name=小红书文字转图片工具',  # 应用名称
+        '--name=小红书文字转图片工具mac',  # 应用名称
         '--windowed',  # macOS上创建.app bundle
         '--noconfirm',  # 覆盖现有文件
-        '--clean',  # 清理临时文��
+        '--clean',  # 清理临时文件  
         '--onedir',  # 创建单目录分发
         
         # 使用临时图标
@@ -94,7 +94,7 @@ if hasattr(sys, '_MEIPASS'):
 
         # 复制额外的资源文件到应用包
         print("Copying additional resources...")
-        app_path = os.path.join("dist", "小红书文字转图片工具.app", "Contents", "MacOS")
+        app_path = os.path.join("dist", "小红书文字转图片工具mac.app", "Contents", "MacOS")
         resources_path = os.path.join(app_path, "resources")
         
         # 确保目标资源目录存在
@@ -122,11 +122,11 @@ if hasattr(sys, '_MEIPASS'):
                     print(f"Error copying {item}: {str(e)}")
 
         print("\nBuild completed!")
-        print("Application bundle created at: dist/小红书文字转图片工具.app")
+        print("Application bundle created at: dist/小红书文字转图片工具mac.app")
         print("\nTo run the application:")
         print("1. Open Finder")
         print("2. Navigate to the 'dist' folder")
-        print("3. Double click '小红书文字转图片工具.app'")
+        print("3. Double click '小红书文字转图片工具mac.app'")
 
     finally:
         # 清理临时文件
