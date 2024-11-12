@@ -81,20 +81,36 @@ class MainWindow(QMainWindow):
         # 创建按钮容器
         button_container = QWidget()
         button_layout = QHBoxLayout(button_container)
+        button_layout.setContentsMargins(0, 0, 0, 0)
+        button_layout.setSpacing(10)  # 设置按钮之间的间距
         
         # 生成按钮
         self.generate_button = QPushButton("生成图片")
         self.generate_button.setObjectName("primaryButton")
+        self.generate_button.setMinimumHeight(40)
+        self.generate_button.clicked.connect(self.generate_image)
         
         # 下载按钮
         self.download_button = QPushButton("下载所有图片")
         self.download_button.setEnabled(False)
         self.download_button.setObjectName("primaryButton")
+        self.download_button.setMinimumHeight(40)
         self.download_button.clicked.connect(self.download_images)
         
-        # 添加按钮到局
+        # 下载文档按钮
+        self.download_text_button = QPushButton("下载文档")
+        self.download_text_button.setEnabled(False)  # 初始状态禁用
+        self.download_text_button.setObjectName("primaryButton")
+        self.download_text_button.setMinimumHeight(40)
+        self.download_text_button.clicked.connect(self.download_text_document)
+        
+        # 添加按钮到布局
         button_layout.addWidget(self.generate_button)
         button_layout.addWidget(self.download_button)
+        button_layout.addWidget(self.download_text_button)
+        
+        # 设置按钮容器的大小策略
+        button_container.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         
         left_layout.addWidget(self.tabs)
         left_layout.addWidget(self.style_panel)
@@ -352,6 +368,7 @@ class MainWindow(QMainWindow):
             # 更新按钮状态
             self.update_navigation_buttons()
             self.download_button.setEnabled(True)
+            self.download_text_button.setEnabled(True)  # 同时启用下载文档按钮
             
             print(f"生成了 {len(self.current_images)} 张图片")
             print("=== 图片生成完成 ===\n")
@@ -362,6 +379,7 @@ class MainWindow(QMainWindow):
             traceback.print_exc()
             self.preview_label.setText("生成图片失败")
             self.download_button.setEnabled(False)
+            self.download_text_button.setEnabled(False)
             self.prev_button.setEnabled(False)
             self.next_button.setEnabled(False)
     
@@ -414,7 +432,7 @@ class MainWindow(QMainWindow):
                 os.remove(temp_path)
                 print("临时预览文件已清理")
             except Exception as e:
-                print(f"清理临时文件���败: {str(e)}")
+                print(f"清理临时文件败: {str(e)}")
                 
         except Exception as e:
             print(f"更新预览失败: {str(e)}")
@@ -450,7 +468,7 @@ class MainWindow(QMainWindow):
             # 获取当前标签页
             current_tab = self.tabs.currentWidget()
             
-            # 选��保存目录
+            # 选保存目录
             directory = QFileDialog.getExistingDirectory(
                 self,
                 "选择保存目录",
@@ -675,6 +693,64 @@ class MainWindow(QMainWindow):
         """当样式文本编辑器的内容改变时"""
         # 移除自动生成图片的逻辑，只在点击生成按钮时生成
         pass
+
+    def download_text_document(self):
+        """下载文本内容到txt文件"""
+        try:
+            # 获取所有内容
+            content = self.text_editor.get_all_content()
+            
+            # 获取标题
+            title = "未命名"
+            for item in content:
+                if item['type'] == 'title' and item.get('text', '').strip():
+                    title = item['text'].strip()
+                    break
+            
+            # 去除可能存在的非法文件名字符
+            safe_title = "".join(c for c in title if c not in r'\/:*?"<>|')
+            
+            # 选择保存目录
+            directory = QFileDialog.getExistingDirectory(
+                self,
+                "选择保存目录",
+                "",
+                QFileDialog.Option.ShowDirsOnly
+            )
+            
+            if directory:
+                # 创建文件名
+                filename = f"{safe_title}.txt"
+                filepath = os.path.join(directory, filename)
+                
+                # 准备文本内容
+                text_content = []
+                for item in content:
+                    if item.get('text', '').strip():
+                        # 根据类型添加不同的格式
+                        if item['type'] == 'title':
+                            text_content.append(f"{item['text']}\n")
+                        else:
+                            text_content.append(f"{item['text']}\n")
+                        text_content.append("\n")  # 添加空行分隔
+                
+                # 写入文件
+                with open(filepath, 'w', encoding='utf-8') as f:
+                    f.writelines(text_content)
+                
+                # 显示成功消息
+                QMessageBox.information(
+                    self,
+                    "导出成功",
+                    f"文档已保存到：\n{filepath}"
+                )
+                
+        except Exception as e:
+            QMessageBox.critical(
+                self,
+                "导出失败",
+                f"保存文档时发生错误：\n{str(e)}"
+            )
 
 class PreviewLabel(QLabel):
     """自定义预览标签，支持椭圆调整"""
