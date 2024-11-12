@@ -2,6 +2,7 @@ import PyInstaller.__main__
 import os
 import shutil
 import sys
+from pathlib import Path
 
 def check_resource_exists(path):
     """检查资源文件是否存在"""
@@ -10,108 +11,107 @@ def check_resource_exists(path):
         return False
     return True
 
-# 定义资源文件列表
-resource_files = [
-    # 字体文件
-    ('resources/fonts/MSYH.TTF', 'resources/fonts/'),  # 微软雅黑字体
-    ('resources/fonts/SourceHanSansSC-VF.ttf', 'resources/fonts/'),  # 思源黑体
-    ('resources/fonts/SourceHanSansHWSC-Bold.otf', 'resources/fonts/'),  # 思源黑体粗体
+def create_resource_list():
+    """创建资源文件列表"""
+    resources_dir = Path('resources')
+    resource_files = []
     
-    # 背景图片
-    ('resources/backgrounds/grid.png', 'resources/backgrounds/'),  # 网格背景
-    ('resources/backgrounds/memo.png', 'resources/backgrounds/'),  # 小红书背景
-    ('resources/backgrounds/new.png', 'resources/backgrounds/'),  # 新背景
-    ('resources/backgrounds/blank.png', 'resources/backgrounds/'),  # 空白背景
+    # 遍历resources目录下的所有文件
+    for file_path in resources_dir.rglob('*'):
+        if file_path.is_file():
+            # 获取相对于resources的路径
+            relative_path = file_path.relative_to(resources_dir)
+            # 创建目标路径（保持目录结构）
+            target_dir = os.path.join('resources', str(relative_path.parent))
+            # 添加到资源列表
+            resource_files.append((str(file_path), target_dir))
     
-    # 图标文件
-    ('resources/icon.png', 'resources/'),  # 应用图标
-    ('resources/icons/app_icon.ico', 'resources/icons/'),  # Windows图标
+    return resource_files
+
+def main():
+    print("=== 开始打包程序 ===")
     
-    # 配置文件
-    ('resources/config.json', 'resources/'),  # 配置文件
-]
-
-# 检查所有资源文件是否存在
-missing_files = False
-for src, _ in resource_files:
-    if not check_resource_exists(src):
-        missing_files = True
-
-if missing_files:
-    print("\n请确保以下目录结构和文件存在:")
-    print("resources/")
-    print("├── fonts/")
-    print("│   ├── MSYH.TTF")
-    print("│   ├── SourceHanSansSC-VF.ttf")
-    print("│   └── SourceHanSansHWSC-Bold.otf")
-    print("├── backgrounds/")
-    print("│   ├── grid.png")
-    print("│   ├── dot.png")
-    print("│   └── blank.png")
-    print("└── icon.png")
-    sys.exit(1)
-
-print("开始打包...")
-
-# 运行PyInstaller
-try:
-    PyInstaller.__main__.run([
+    # 获取所有资源文件
+    resource_files = create_resource_list()
+    
+    # 检查资源文件是否存在
+    missing_files = False
+    for src, _ in resource_files:
+        if not check_resource_exists(src):
+            missing_files = True
+    
+    if missing_files:
+        print("\n错误：缺少必要的资源文件")
+        print("请确保resources目录包含所有必要文件")
+        sys.exit(1)
+    
+    # 准备PyInstaller参数
+    pyinstaller_args = [
         'main.py',
         '--name=小红书文字转图片工具',
-        '--windowed',
+        '--windowed',  # 无控制台窗口
         '--icon=resources/icons/app_icon.ico',
-        '--add-data=resources;resources',  # 确保资源文件被包含
+        '--add-data=resources;resources',  # 添加整个resources目录
         '--hidden-import=PyQt6.QtCore',
         '--hidden-import=PyQt6.QtGui',
         '--hidden-import=PyQt6.QtWidgets',
         '--hidden-import=ui.styles',
         '--hidden-import=ui.style_text_editor',
         '--hidden-import=PIL',
-        '--clean',
-        '--noconfirm',
-    ])
-    print("PyInstaller 打包完成!")
-
-    # 获取目标目录路径
-    dist_dir = os.path.join("dist", "小红书文字转图片工具")
+        '--clean',  # 清理临时文件
+        '--noconfirm',  # 不确认覆盖
+        '--noupx',  # 不使用UPX压缩
+        '--noconsole',  # 不显示控制台
+        # 优化选项
+        '--optimize=2',  # 应用优化
+        '--log-level=WARN',  # 只显示警告和错误
+    ]
     
-    # 确保目标目录存在
-    if not os.path.exists(dist_dir):
-        print(f"错误: 找不到生成的应用程序目录 {dist_dir}")
+    try:
+        print("\n1. 开始PyInstaller打包...")
+        PyInstaller.__main__.run(pyinstaller_args)
+        print("PyInstaller打包完成!")
+        
+        # 获取生成的目录路径
+        dist_dir = Path("dist") / "小红书文字转图片工具"
+        
+        if not dist_dir.exists():
+            raise FileNotFoundError(f"找不到生成的应用程序目录: {dist_dir}")
+        
+        print("\n2. 开始复制资源文件...")
+        # 复制资源文件到目标目录
+        for src, dst in resource_files:
+            dst_dir = dist_dir / dst
+            dst_dir.mkdir(parents=True, exist_ok=True)
+            dst_path = dst_dir / Path(src).name
+            
+            print(f"复制: {src} -> {dst_path}")
+            try:
+                shutil.copy2(src, dst_path)
+            except Exception as e:
+                print(f"警告: 复制文件失败 {src}: {str(e)}")
+                # 继续执行，而不是立即退出
+        
+        print("资源文件复制完成!")
+        
+        # 清理临时文件和目录
+        print("\n4. 清理临时文件...")
+        if Path("build").exists():
+            shutil.rmtree("build")
+        for file in Path(".").glob("*.spec"):
+            file.unlink()
+        
+        print("\n=== 打包完成! ===")
+        print(f"生成的文件在: {dist_dir}")
+        print("\n提示：")
+        print("1. 请检查dist目录中的程序是否可以正常运行")
+        print("2. 确保所有资源文件都已正确包含")
+        print("3. 如果运行出现问题，请查看是否缺少必要的DLL文件")
+        
+    except Exception as e:
+        print(f"\n错误: 打包过程出错")
+        print(f"详细信息: {str(e)}")
         sys.exit(1)
 
-    print("\n开始复制资源文件...")
-    
-    # 复制资源文件到目标目录
-    for src, dst in resource_files:
-        dst_dir = os.path.join(dist_dir, dst)
-        # 确保目标目录存在
-        if not os.path.exists(dst_dir):
-            os.makedirs(dst_dir)
-        dst_path = os.path.join(dst_dir, os.path.basename(src))
-        print(f"复制: {src} -> {dst_path}")
-        try:
-            shutil.copy2(src, dst_path)
-        except Exception as e:
-            print(f"复制文件失败 {src}: {str(e)}")
-            sys.exit(1)
-
-    print("资源文件复制完成!")
-
-    # 创建发布目录
-    release_dir = "release"
-    if not os.path.exists(release_dir):
-        os.makedirs(release_dir)
-
-    # 复制整个dist目录到发布目录
-    release_path = os.path.join(release_dir, "小红书文字转图片工具")
-    if os.path.exists(release_path):
-        shutil.rmtree(release_path)
-    shutil.copytree(dist_dir, release_path)
-    print(f"\n应用程序已复制到: {release_path}")
-
-except Exception as e:
-    print(f"打包过程出错: {str(e)}")
-    sys.exit(1)
-
-print("\n打包完成! 生成的文件在 release 目录中")
+if __name__ == "__main__":
+    main()
