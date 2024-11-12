@@ -1,24 +1,32 @@
+try:
+    # 首先尝试相对导入（当作为包的一部分导入时）
+    from .text_editor import TextEditor
+    from .style_panel import StylePanel
+    from .styles import FusionStyle
+    from .style_text_editor import StyleTextEditor
+except ImportError:
+    # 如果相对导入失败，使用绝对导入（当直接运行文件时）
+    from ui.text_editor import TextEditor
+    from ui.style_panel import StylePanel
+    from ui.styles import FusionStyle
+    from ui.style_text_editor import StyleTextEditor
+
 from PyQt6.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, 
                            QTabWidget, QTextEdit, QPushButton, QComboBox, 
                            QRadioButton, QLabel, QScrollArea, QFileDialog, 
-                           QSizePolicy, QFrame)
+                           QSizePolicy, QFrame, QMessageBox)
 from PyQt6.QtCore import Qt, QSize, QPoint
 from PyQt6.QtGui import QPixmap, QResizeEvent, QIcon, QPainter, QPen, QColor
-from .text_editor import TextEditor
-from .style_panel import StylePanel
 from core.image_generator import ImageGenerator
 from core.ai_helper import AIHelper
 import asyncio
 import os
 import json
 from datetime import datetime
-from .styles import FusionStyle
 from PIL import Image
 from PyQt6.QtCore import QTimer
-from .style_text_editor import StyleTextEditor
 from PIL import ImageDraw
 from PIL import ImageFont
-from ui.styles import *  # 或者具体的样式导入
 import sys
 import tempfile
 import time
@@ -406,7 +414,7 @@ class MainWindow(QMainWindow):
                 os.remove(temp_path)
                 print("临时预览文件已清理")
             except Exception as e:
-                print(f"清理临时文件失败: {str(e)}")
+                print(f"清理临时文件���败: {str(e)}")
                 
         except Exception as e:
             print(f"更新预览失败: {str(e)}")
@@ -435,14 +443,14 @@ class MainWindow(QMainWindow):
     def download_images(self):
         """下载所有图片"""
         if not self.current_images:
-            print("没有可下载的图片")
+            QMessageBox.warning(self, "导出失败", "没有可下载的图片")
             return
             
         try:
             # 获取当前标签页
             current_tab = self.tabs.currentWidget()
             
-            # 选择保存目录
+            # 选��保存目录
             directory = QFileDialog.getExistingDirectory(
                 self,
                 "选择保存目录",
@@ -452,7 +460,7 @@ class MainWindow(QMainWindow):
             
             if directory:
                 if current_tab == self.style_text_tab:
-                    # 封编辑模式：直接保存图片
+                    # 封面编辑模式：直接保存图片
                     content = self.style_text_editor.text_edit.toPlainText()
                     # 去除可能存在的非法文件名字符
                     safe_content = "".join(c for c in content if c not in r'\/:*?"<>|')
@@ -461,7 +469,13 @@ class MainWindow(QMainWindow):
                     
                     # 保存图片
                     self.current_images[0].save(filepath, 'PNG')
-                    print(f"封面图片已保存: {filepath}")
+                    
+                    # 显示成功消息
+                    QMessageBox.information(
+                        self,
+                        "导出成功",
+                        f"成功导出 1 张封面图片\n保存路径：{filepath}"
+                    )
                     
                 else:
                     # 文本编辑模式：创建日期-标题文件夹
@@ -489,19 +503,36 @@ class MainWindow(QMainWindow):
                     os.makedirs(folder_path, exist_ok=True)
                     
                     # 保存所有图片
+                    saved_count = 0
                     for i, image in enumerate(self.current_images):
-                        filename = f"{safe_title}_{i + 1}.png"
-                        filepath = os.path.join(folder_path, filename)
-                        
-                        # 保存图片
-                        image.save(filepath, 'PNG')
+                        try:
+                            filename = f"{safe_title}_{i + 1}.png"
+                            filepath = os.path.join(folder_path, filename)
+                            image.save(filepath, 'PNG')
+                            saved_count += 1
+                        except Exception as e:
+                            print(f"保存图片 {i + 1} 失败: {str(e)}")
                     
-                    print(f"所有图片已保存到文件夹: {folder_path}")
-            else:
-                print("未选择保存目录")
-                
+                    # 显示成功消息
+                    if saved_count == len(self.current_images):
+                        QMessageBox.information(
+                            self,
+                            "导出成功",
+                            f"成功导出 {saved_count} 张图片\n保存路径：{folder_path}"
+                        )
+                    else:
+                        QMessageBox.warning(
+                            self,
+                            "部分导出成功",
+                            f"成功导出 {saved_count}/{len(self.current_images)} 张图片\n保存路径：{folder_path}"
+                        )
+            
         except Exception as e:
-            print(f"保存图片错误: {str(e)}")
+            QMessageBox.critical(
+                self,
+                "导出失败",
+                f"保存图片时发生错误：\n{str(e)}"
+            )
     
     def preview_style_change(self, style):
         """当样式改变时更新预览"""
@@ -568,7 +599,7 @@ class MainWindow(QMainWindow):
         width_based_height = available_width * image_ratio
         height_based_width = available_height / image_ratio
         
-        # ���择较小的尺寸以确保完全可见
+        # 择较小的尺寸以确保完全可见
         if width_based_height <= available_height:
             # 以宽度为基准
             preview_width = available_width
