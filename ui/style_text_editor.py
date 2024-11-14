@@ -3,6 +3,9 @@ from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QTextEdit,
                            QColorDialog, QFrame)
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QFont, QKeyEvent, QColor
+import os
+import sys
+from PyQt6.QtGui import QFontDatabase
 
 class StyleTextEditor(QWidget):
     content_changed = pyqtSignal()
@@ -21,6 +24,31 @@ class StyleTextEditor(QWidget):
         self.current_color = '#ffaa7f'  # 椭圆默认颜色
         self.underline_current_color = '#ffaa7f'  # 下划线默认颜色
         self.init_ui()
+
+        # 加载字体
+        if hasattr(sys, '_MEIPASS'):
+            self.normal_font_path = os.path.join(sys._MEIPASS, 'resources', 'fonts', 'SourceHanSansCN-VF.ttf')
+            self.bold_font_path = os.path.join(sys._MEIPASS, 'resources', 'fonts', 'SourceHanSansHWSC-Bold.otf')
+        else:
+            self.normal_font_path = os.path.join('resources', 'fonts', 'SourceHanSansCN-VF.ttf')
+            self.bold_font_path = os.path.join('resources', 'fonts', 'SourceHanSansHWSC-Bold.otf')
+        
+        # 添加字体到 Qt 字体数据库
+        self.normal_font_id = QFontDatabase.addApplicationFont(self.normal_font_path)
+        self.bold_font_id = QFontDatabase.addApplicationFont(self.bold_font_path)
+        
+        # 获取字体族名称
+        if self.normal_font_id != -1:
+            self.normal_font_family = QFontDatabase.applicationFontFamilies(self.normal_font_id)[0]
+        else:
+            print("无法加载常规思源黑体，使用系统默认字体")
+            self.normal_font_family = "Microsoft YaHei UI"
+            
+        if self.bold_font_id != -1:
+            self.bold_font_family = QFontDatabase.applicationFontFamilies(self.bold_font_id)[0]
+        else:
+            print("无法加载粗体思源黑体，使用系统默认粗体")
+            self.bold_font_family = "Microsoft YaHei UI"
 
     def init_ui(self):
         layout = QVBoxLayout(self)
@@ -207,7 +235,7 @@ class StyleTextEditor(QWidget):
         separator.setFrameShadow(QFrame.Shadow.Sunken)
         layout.addWidget(separator)
 
-        # 添加字间距和行间距控制面板
+        # 添加字��距和行间距控制面板
         spacing_control = QWidget()
         spacing_layout = QHBoxLayout(spacing_control)
         spacing_layout.setContentsMargins(0, 0, 0, 0)
@@ -434,17 +462,18 @@ class StyleTextEditor(QWidget):
         self.update_all_char_buttons()
 
     def update_text_edit_font(self):
-        """更新文本编辑器的字体 - 仅设置字体族，保持大小不变"""
-        font = QFont("Microsoft YaHei UI", 14)  # 固定大小为14pt
-        font.setBold(self.font_bold)
+        """更新文本编辑器的字体"""
+        # 根据是否加粗选择不同的字体族
+        font_family = self.bold_font_family if self.font_bold else self.normal_font_family
+        font = QFont(font_family, 14)  # 编辑器固定使用14pt大小
         self.text_edit.setFont(font)
 
     def on_font_size_changed(self, size):
         """当字号改变时"""
         self.font_size = size
         # 更新编辑器字体，但保持编辑时的字体大小不变
-        font = QFont("Microsoft YaHei UI", 14)  # 保持编辑时的字体大小为14pt
-        font.setBold(self.font_bold)
+        font_family = self.bold_font_family if self.font_bold else self.normal_font_family
+        font = QFont(font_family, 14)  # 保持编辑时的字体大小为14pt
         self.text_edit.setFont(font)
         self.font_changed.emit()
         self.style_applied.emit()

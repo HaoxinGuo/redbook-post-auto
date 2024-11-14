@@ -305,6 +305,11 @@ class ImageGenerator:
     
     def create_single_image(self, text_content, background_path, font_style='normal'):
         """创建单个图片"""
+        print("\n=== 开始创建图片 ===")
+        print(f"文本内容: {text_content.get('text', '')[:50]}...")  # 只打印前50个字符
+        print(f"字体大小: {text_content.get('font_size', 48)}")
+        print(f"是否加粗: {text_content.get('font_bold', False)}")
+        
         # 创建基础图片
         image = Image.new('RGB', (self.width, self.height), 'white')
         
@@ -314,18 +319,43 @@ class ImageGenerator:
                 bg = Image.open(background_path)
                 bg = bg.resize((self.width, self.height))
                 image.paste(bg, (0, 0))
+                print(f"背景图片加载成功: {background_path}")
             except Exception as e:
                 print(f"加载背景图片失败: {str(e)}")
-            
+        
         # 创建绘图对象
         draw = ImageDraw.Draw(image)
         
-        # 获取字体
-        font = self.fonts[font_style]
+        # 获取内容
+        text = text_content.get('text', '')
+        font_size = text_content.get('font_size', 48)
+        line_spacing = text_content.get('line_spacing', 20)
+        char_spacing = text_content.get('char_spacing', 0)
+        marks = text_content.get('marks', {})
+        is_bold = text_content.get('font_bold', False)  # 获取加粗设置
         
-        # 渲染文字
-        self.render_text(draw, text_content, font)
+        print("\n=== 文本渲染参数 ===")
+        print(f"行间距: {line_spacing}")
+        print(f"字间距: {char_spacing}")
+        print(f"样式标记数: {len(marks)}")
         
+        # 创建字体对象，传入加粗参数
+        font = self.create_font(font_size, is_bold)
+        print(f"字体对象创建结果: {font}")
+        
+        # 绘制文字
+        self.draw_styled_text(
+            draw,
+            text,
+            marks,
+            0,
+            0,
+            font,
+            char_spacing=char_spacing,
+            line_spacing=line_spacing
+        )
+        
+        print("=== 图片创建完成 ===\n")
         return image
     
     def process_list_text(self, text):
@@ -745,3 +775,43 @@ class ImageGenerator:
                     fill=underline['color'],
                     width=underline['width']
                 )
+    
+    def create_font(self, size, is_bold=False):
+        """创建字体对象，支持不同字重的字体"""
+        try:
+            # 根据是否加粗选择不同的字体文件
+            if is_bold:
+                font_name = 'SourceHanSansHWSC-Bold.otf'
+            else:
+                font_name = 'SourceHanSansCN-VF.ttf'
+            
+            print(f"\n=== 创建字体 ===")
+            print(f"字体大小: {size}")
+            print(f"是否加粗: {is_bold}")
+            print(f"选择字体文件: {font_name}")
+            
+            # 获取字体路径
+            if hasattr(sys, '_MEIPASS'):
+                font_path = os.path.join(sys._MEIPASS, 'resources', 'fonts', font_name)
+            else:
+                font_path = os.path.join('resources', 'fonts', font_name)
+            
+            print(f"字体完整路径: {font_path}")
+            print(f"字体文件是否存在: {os.path.exists(font_path)}")
+
+            # 创建字体对象
+            font = ImageFont.truetype(font_path, size)
+            print("字体创建成功")
+            return font
+        
+        except Exception as e:
+            print(f"创建字体失败: {str(e)}")
+            print(f"错误类型: {type(e)}")
+            # 如果创建失败，尝试使用系统默认字体
+            try:
+                print("尝试使用系统默认字体 arial.ttf")
+                return ImageFont.truetype("arial.ttf", size)
+            except Exception as e2:
+                print(f"加载系统默认字体也失败: {str(e2)}")
+                print("使用 PIL 默认字体")
+                return ImageFont.load_default()

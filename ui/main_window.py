@@ -197,7 +197,7 @@ class MainWindow(QMainWindow):
         nav_layout.addStretch(1)  # 添加弹性空间
         nav_layout.addWidget(self.next_button)
         
-        # 将预览标签和航按钮添加到预览内容布局
+        # 将预览标签和���按钮添加到预览内容布局
         preview_content_layout.addWidget(nav_container)
         
         # 创建滚动区域
@@ -297,6 +297,8 @@ class MainWindow(QMainWindow):
             if current_tab == self.style_text_tab:
                 print("处理封面编辑内容")
                 content = self.style_text_editor.get_content()
+                print(f"封面编辑内容: {content}")
+                
                 # 创建单页图片
                 image = Image.new('RGB', (self.image_generator.width, self.image_generator.height), 'white')
                 print("创建新图片")
@@ -315,32 +317,22 @@ class MainWindow(QMainWindow):
                 draw = ImageDraw.Draw(image)
                 print("创建绘图对象")
                 
-                # 设置字体
+                # 获取字体大小和加粗状态
                 font_size = content.get('font_size', 48)
-                print(f"字体大小: {font_size}")
+                is_bold = content.get('font_bold', False)
+                print(f"字体大小: {font_size}, 是否加粗: {is_bold}")
                 
-                if hasattr(sys, '_MEIPASS'):
-                    font_path = os.path.join(sys._MEIPASS, 'resources', 'fonts', 'SourceHanSansCN-VF.ttf')
-                else:
-                    font_path = os.path.join('resources', 'fonts', 'SourceHanSansCN-VF.ttf')
+                # 创建字体对象，传入加粗参数
+                font = self.image_generator.create_font(font_size, is_bold)
+                print(f"字体对象创建完成: {font}")
                 
-                print(f"字体路径: {font_path}")
-                
-                try:
-                    font = ImageFont.truetype(font_path, font_size)
-                    print("字体加载成功")
-                except Exception as e:
-                    print(f"加载字体失败: {str(e)}")
-                    return
-                
-                # 绘制文本
-                print("开始绘制文本")
+                # 绘制文字
                 self.image_generator.draw_styled_text(
-                    draw, 
-                    content['text'], 
+                    draw,
+                    content['text'],
                     content['marks'],
-                    0, 
-                    0, 
+                    0,
+                    0,
                     font,
                     char_spacing=content.get('char_spacing', 0),
                     line_spacing=content.get('line_spacing', 20)
@@ -368,7 +360,7 @@ class MainWindow(QMainWindow):
             # 更新按钮状态
             self.update_navigation_buttons()
             self.download_button.setEnabled(True)
-            self.download_text_button.setEnabled(True)  # 同时启用下载文档按钮
+            self.download_text_button.setEnabled(True)
             
             print(f"生成了 {len(self.current_images)} 张图片")
             print("=== 图片生成完成 ===\n")
@@ -416,7 +408,7 @@ class MainWindow(QMainWindow):
             # 获取预览标签的大小
             label_size = self.preview_label.size()
             
-            # 缩放图片以填充预览标签，保持宽高比
+            # 缩放���片以填充预览标签，保持宽高比
             scaled_pixmap = pixmap.scaled(
                 label_size,
                 Qt.AspectRatioMode.KeepAspectRatio,
