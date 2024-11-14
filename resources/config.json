@@ -14,10 +14,15 @@
             "name": "新背景",
             "value": "new",
             "url": "resources/backgrounds/new.png"
+        },
+        {
+            "name": "纯灰色",
+            "value": "puregray",
+            "url": "resources/backgrounds/puregray.png"
         }
     ],
     "fonts": {
-        "normal": "resources/fonts/SourceHanSansSC-VF.ttf",
+        "normal": "resources/fonts/SourceHanSansCN-VF.ttf",
         "handwritten": "resources/fonts/bailutongtongshouxieti.ttf"
     }
 } 

@@ -197,7 +197,7 @@ class MainWindow(QMainWindow):
         nav_layout.addStretch(1)  # 添加弹性空间
         nav_layout.addWidget(self.next_button)
         
-        # 将预览标签和导航按钮添加到预览内容布局
+        # 将预览标签和航按钮添加到预览内容布局
         preview_content_layout.addWidget(nav_container)
         
         # 创建滚动区域
@@ -320,9 +320,9 @@ class MainWindow(QMainWindow):
                 print(f"字体大小: {font_size}")
                 
                 if hasattr(sys, '_MEIPASS'):
-                    font_path = os.path.join(sys._MEIPASS, 'resources', 'fonts', 'SourceHanSansSC-VF.ttf')
+                    font_path = os.path.join(sys._MEIPASS, 'resources', 'fonts', 'SourceHanSansCN-VF.ttf')
                 else:
-                    font_path = os.path.join('resources', 'fonts', 'SourceHanSansSC-VF.ttf')
+                    font_path = os.path.join('resources', 'fonts', 'SourceHanSansCN-VF.ttf')
                 
                 print(f"字体路径: {font_path}")
                 
@@ -568,71 +568,17 @@ class MainWindow(QMainWindow):
         
     def calculate_initial_preview_size(self):
         """计算初始预览尺寸"""
-        # 获取右侧面板的初始尺寸
-        right_width = int(self.width() * 0.4)  # 右侧面板占40%
-        right_height = self.height()
-        
-        # 计算可用空间，考虑边距和导航按钮
-        available_width = right_width - 100  # 减去导航按钮宽度和边距
-        available_height = right_height - 40  # 减去上下边距
-        
-        # 确保可用尺寸不小于最小值
-        available_width = max(400, available_width)
-        available_height = max(533, available_height)
-        
-        # 计算保持宽高比的最大尺寸
-        image_ratio = 3/4  # 图片的宽高比
-        container_ratio = available_width / available_height
-        
-        if container_ratio > image_ratio:
-            # 如果容器更宽，以高度为基准
-            preview_height = available_height
-            preview_width = preview_height / image_ratio
-        else:
-            # 如果容器更高，以宽度为基准
-            preview_width = available_width
-            preview_height = preview_width * image_ratio
+        # 使用 iPhone 15 Pro 的显示比例
+        preview_width = int(1080 * self.preview_label.default_zoom)
+        preview_height = int(1440 * self.preview_label.default_zoom)
         
         # 更新预览标签的固定大小
-        self.preview_label.setFixedSize(QSize(int(preview_width), int(preview_height)))
+        self.preview_label.setFixedSize(QSize(preview_width, preview_height))
     
     def update_preview_size(self):
         """更新预览图片大小"""
-        # 获取滚动区域的可见大小
-        viewport_width = self.right_scroll.viewport().width()
-        viewport_height = self.right_scroll.viewport().height()
-        
-        # 计算可用空间，考虑边距和导航按钮
-        available_width = viewport_width - 40  # 减去左右边距
-        available_height = viewport_height - 40  # 减去上下边距
-        
-        # 确保可用尺寸不小于最小值
-        available_width = max(400, available_width)
-        available_height = max(533, available_height)
-        
-        # 计算持宽高比的最大尺寸
-        image_ratio = 3/4  # 图片的宽高比
-        
-        # 计算基于宽度和高度的可能尺寸
-        width_based_height = available_width * image_ratio
-        height_based_width = available_height / image_ratio
-        
-        # 择较小的尺寸以确保完全可见
-        if width_based_height <= available_height:
-            # 以宽度为基准
-            preview_width = available_width
-            preview_height = width_based_height
-        else:
-            # 以高度为基准
-            preview_width = height_based_width
-            preview_height = available_height
-        
-        # 确保尺寸不超过可见区域
-        preview_width = min(preview_width, available_width)
-        preview_height = min(preview_height, available_height)
-        
-        # 更新预览标签的固定大小
-        self.preview_label.setFixedSize(QSize(int(preview_width), int(preview_height)))
+        # 让 PreviewLabel 自己处理缩放
+        self.preview_label.update_preview_size()
         
         # 更新当前显示的图片或背景
         if self.current_images:
@@ -727,7 +673,7 @@ class MainWindow(QMainWindow):
                 text_content = []
                 for item in content:
                     if item.get('text', '').strip():
-                        # 根据类型添加不同的格式
+                        # 根据类型加不同的格式
                         if item['type'] == 'title':
                             text_content.append(f"{item['text']}\n")
                         else:
@@ -767,272 +713,72 @@ class PreviewLabel(QLabel):
         self.underline_marks = []
         self.style_text_editor = None
         self.scale_factor = 1.0
-
-    def update_scale_factor(self):
-        """更新缩放比例"""
-        if not self.pixmap():
-            return
-        # 计算预览图片相对于原始图片的缩放比例
-        self.scale_factor = self.pixmap().width() / 1080  # 1080是原始图片宽度
+        
+        self._original_pixmap = None  # 添加这行来存储原始图片
+        self.zoom_factor = 1.0
+        self.iphone_width = 1179
+        self.iphone_height = 2556
+        self.min_zoom = 0.2
+        self.max_zoom = 2.0
+        
+        # 设置默认缩放以适应 iPhone 显示效果
+        self.default_zoom = min(
+            self.iphone_width / 1080,
+            self.iphone_height / 1440
+        ) * 0.4
+        self.zoom_factor = self.default_zoom
+        
+        self.setFocusPolicy(Qt.FocusPolicy.WheelFocus)
 
     def setPixmap(self, pixmap):
-        """重写setPixmap方法以更新缩放比例"""
-        super().setPixmap(pixmap)
-        self.update_scale_factor()
-
-    def get_real_coordinates(self, pos):
-        """将预览坐标转换为实际图片坐标"""
-        if not self.pixmap():
-            return pos
-        # 获取图片在标签中的实际位置
-        x_offset = (self.width() - self.pixmap().width()) // 2
-        y_offset = (self.height() - self.pixmap().height()) // 2
-        # 转换坐标
-        real_x = (pos.x() - x_offset) / self.scale_factor
-        real_y = (pos.y() - y_offset) / self.scale_factor
-        return QPoint(int(real_x), int(real_y))
-
-    def get_preview_coordinates(self, real_pos):
-        """将实际图片坐标转换为预览坐标"""
-        if not self.pixmap():
-            return real_pos
-        x_offset = (self.width() - self.pixmap().width()) // 2
-        y_offset = (self.height() - self.pixmap().height()) // 2
-        preview_x = real_pos.x() * self.scale_factor + x_offset
-        preview_y = real_pos.y() * self.scale_factor + y_offset
-        return QPoint(int(preview_x), int(preview_y))
-
-    def is_on_ellipse_edge(self, pos, ellipse):
-        """检查点是否在椭圆边缘"""
-        real_pos = self.get_real_coordinates(pos)
-        
-        # 算椭圆的边界框
-        char_width = 32 * self.scale_factor  # 考虑缩放因子
-        text_x = (self.width() - len(self.style_text_editor.text_edit.toPlainText()) * char_width) // 2
-        x1 = text_x + ellipse['start'] * char_width - ellipse['size'] * self.scale_factor
-        x2 = text_x + (ellipse['end'] + 1) * char_width + ellipse['size'] * self.scale_factor
-        y1 = self.height() // 2 - 24 * self.scale_factor - ellipse['size'] * self.scale_factor + ellipse['position'] * self.scale_factor
-        y2 = self.height() // 2 + 24 * self.scale_factor + ellipse['size'] * self.scale_factor + ellipse['position'] * self.scale_factor
-        
-        # 检查是否在边缘区域（边缘区域定义为距离边框5像素以内）
-        edge_threshold = 5 * self.scale_factor
-        x, y = pos.x(), pos.y()
-        
-        # 简化的椭圆边缘检测
-        if (abs(x - x1) <= edge_threshold or abs(x - x2) <= edge_threshold) and y1 <= y <= y2:
-            return True
-        if (abs(y - y1) <= edge_threshold or abs(y - y2) <= edge_threshold) and x1 <= x <= x2:
-            return True
-        return False
-
-    def is_on_ellipse_border(self, pos, ellipse):
-        """检查点是否在椭圆边框上"""
-        real_pos = self.get_real_coordinates(pos)
-        
-        # 计算椭圆的边界框
-        char_width = 32 * self.scale_factor
-        text_x = (self.width() - len(self.style_text_editor.text_edit.toPlainText()) * char_width) // 2
-        x1 = text_x + ellipse['start'] * char_width - ellipse['size'] * self.scale_factor
-        x2 = text_x + (ellipse['end'] + 1) * char_width + ellipse['size'] * self.scale_factor
-        y1 = self.height() // 2 - 24 * self.scale_factor - ellipse['size'] * self.scale_factor + ellipse['position'] * self.scale_factor
-        y2 = self.height() // 2 + 24 * self.scale_factor + ellipse['size'] * self.scale_factor + ellipse['position'] * self.scale_factor
-        
-        # 检查是否在边框上（边框区域定义为距离边框2像素以内）
-        border_threshold = 2 * self.scale_factor
-        x, y = pos.x(), pos.y()
-        
-        # 简化的边框检测
-        if (abs(x - x1) <= border_threshold or abs(x - x2) <= border_threshold) and y1 <= y <= y2:
-            return True
-        if (abs(y - y1) <= border_threshold or abs(y - y2) <= border_threshold) and x1 <= x <= x2:
-            return True
-        return False
-
-    def is_inside_ellipse(self, pos, ellipse):
-        """检查点是否在椭圆内部"""
-        real_pos = self.get_real_coordinates(pos)
-        
-        # 计算椭圆的边界框
-        char_width = 32 * self.scale_factor
-        text_x = (self.width() - len(self.style_text_editor.text_edit.toPlainText()) * char_width) // 2
-        x1 = text_x + ellipse['start'] * char_width - ellipse['size'] * self.scale_factor
-        x2 = text_x + (ellipse['end'] + 1) * char_width + ellipse['size'] * self.scale_factor
-        y1 = self.height() // 2 - 24 * self.scale_factor - ellipse['size'] * self.scale_factor + ellipse['position'] * self.scale_factor
-        y2 = self.height() // 2 + 24 * self.scale_factor + ellipse['size'] * self.scale_factor + ellipse['position'] * self.scale_factor
-        
-        # 检查是否在圆内部
-        x, y = pos.x(), pos.y()
-        return x1 <= x <= x2 and y1 <= y <= y2
-
-    def is_on_underline(self, pos, underline):
-        """检查点是否在下划线上"""
-        real_pos = self.get_real_coordinates(pos)
-        
-        # 计算下划线的位置
-        char_width = 32 * self.scale_factor
-        text_x = (self.width() - len(self.style_text_editor.text_edit.toPlainText()) * char_width) // 2
-        x1 = text_x + underline['start'] * char_width
-        x2 = text_x + (underline['end'] + 1) * char_width
-        y = self.height() // 2 + 24 * self.scale_factor + underline['offset'] * self.scale_factor
-        
-        # 检查是否在下划线区域内（考虑线条宽度）
-        threshold = max(5, underline['width']) * self.scale_factor
-        x, pos_y = pos.x(), pos.y()
-        return x1 <= x <= x2 and abs(y - pos_y) <= threshold
-
-    def mousePressEvent(self, event):
-        if event.button() == Qt.MouseButton.LeftButton:
-            # 先检查椭圆
-            for ellipse in self.ellipse_marks:
-                if self.is_on_ellipse_edge(event.pos(), ellipse):
-                    self.resizing = True
-                    self.current_ellipse = ellipse
-                    self.current_underline = None
-                    self.drag_start = event.pos()
-                    self.select_text_range(ellipse['start'], ellipse['end'])
-                    return
-                elif self.is_on_ellipse_border(event.pos(), ellipse):
-                    self.adjusting_width = True
-                    self.current_ellipse = ellipse
-                    self.current_underline = None
-                    self.drag_start = event.pos()
-                    self.select_text_range(ellipse['start'], ellipse['end'])
-                    return
-                elif self.is_inside_ellipse(event.pos(), ellipse):
-                    self.dragging = True
-                    self.current_ellipse = ellipse
-                    self.current_underline = None
-                    self.drag_start = event.pos()
-                    self.select_text_range(ellipse['start'], ellipse['end'])
-                    return
-
-            # 再检查下划线
-            for underline in self.underline_marks:
-                if self.is_on_underline(event.pos(), underline):
-                    self.current_underline = underline
-                    self.current_ellipse = None
-                    self.drag_start = event.pos()
-                    self.select_text_range(underline['start'], underline['end'])
-                    return
-
-    def select_text_range(self, start, end):
-        """在文本编辑器中选中指定范围的文本"""
-        if self.style_text_editor:
-            cursor = self.style_text_editor.text_edit.textCursor()
-            cursor.setPosition(start)
-            cursor.setPosition(end + 1, QTextCursor.MoveMode.KeepAnchor)
-            self.style_text_editor.text_edit.setTextCursor(cursor)
-
-    def mouseMoveEvent(self, event):
-        if self.dragging and self.current_ellipse:
-            # 移动椭圆
-            current_pos = self.get_real_coordinates(event.pos())
-            start_pos = self.get_real_coordinates(self.drag_start)
-            delta = current_pos.y() - start_pos.y()
-            self.current_ellipse['position'] = max(-20, min(20, 
-                self.current_ellipse['position'] + int(delta / self.scale_factor)))
-            self.drag_start = event.pos()
-            self.update_style_editor()
-        elif self.resizing and self.current_ellipse:
-            # 调整椭圆大小
-            current_pos = self.get_real_coordinates(event.pos())
-            start_pos = self.get_real_coordinates(self.drag_start)
-            delta = current_pos.x() - start_pos.x()
-            self.current_ellipse['size'] = max(5, min(30, 
-                self.current_ellipse['size'] + int(delta / self.scale_factor)))
-            self.drag_start = event.pos()
-            self.update_style_editor()
-        elif self.adjusting_width and self.current_ellipse:
-            # 调整线条粗细
-            current_pos = self.get_real_coordinates(event.pos())
-            start_pos = self.get_real_coordinates(self.drag_start)
-            delta = current_pos.y() - start_pos.y()
-            new_width = self.current_ellipse['width'] + int(delta / (5 * self.scale_factor))
-            self.current_ellipse['width'] = max(1, min(50, new_width))
-            self.drag_start = event.pos()
-            self.update_style_editor()
+        """重写setPixmap方法以应用缩放"""
+        if pixmap:
+            self._original_pixmap = pixmap
+            self.update_preview_size()
         else:
-            # 更新鼠标样式
-            cursor = Qt.CursorShape.ArrowCursor
-            for ellipse in self.ellipse_marks:
-                if self.is_on_ellipse_edge(event.pos(), ellipse):
-                    cursor = Qt.CursorShape.SizeHorCursor
-                    break
-                elif self.is_on_ellipse_border(event.pos(), ellipse):
-                    cursor = Qt.CursorShape.SizeVerCursor
-                    break
-                elif self.is_inside_ellipse(event.pos(), ellipse):
-                    cursor = Qt.CursorShape.SizeAllCursor
-                    break
-            
-            # 检查下划线
-            for underline in self.underline_marks:
-                if self.is_on_underline(event.pos(), underline):
-                    cursor = Qt.CursorShape.PointingHandCursor
-                    break
-                    
-            self.setCursor(cursor)
+            self._original_pixmap = None
+            super().setPixmap(None)
 
-        super().mouseMoveEvent(event)
+    def update_preview_size(self):
+        """更新预览图片大小"""
+        if not self._original_pixmap:
+                    return
 
-    def mouseReleaseEvent(self, event):
-        self.dragging = False
-        self.resizing = False
-        self.adjusting_width = False
-        self.current_ellipse = None
-        self.current_underline = None
+        # 计算缩放后的尺寸
+        scaled_width = int(1080 * self.zoom_factor)
+        scaled_height = int(1440 * self.zoom_factor)
+        
+        # 设置固定大小
+        self.setFixedSize(scaled_width, scaled_height)
+        
+        # 缩放图片
+        scaled_pixmap = self._original_pixmap.scaled(
+            scaled_width,
+            scaled_height,
+            Qt.AspectRatioMode.KeepAspectRatio,
+            Qt.TransformationMode.SmoothTransformation
+        )
+        
+        # 使用父类的setPixmap方法来避免递归
+        super().setPixmap(scaled_pixmap)
+        
+        # 更新缩放因子
+        self.scale_factor = scaled_width / 1080
 
-    def update_style_editor(self):
-        """更新StyleTextEditor中的控制值和标记"""
-        if self.style_text_editor and self.current_ellipse:
-            # 更新控制面板的值
-            self.style_text_editor.position_spin.blockSignals(True)
-            self.style_text_editor.size_spin.blockSignals(True)
-            self.style_text_editor.width_spin.blockSignals(True)
+    def wheelEvent(self, event):
+        """处理鼠标滚轮事件实现缩放"""
+        if event.modifiers() == Qt.KeyboardModifier.ControlModifier:
+            delta = event.angleDelta().y()
+            zoom_delta = 1.1 if delta > 0 else 0.9
             
-            self.style_text_editor.position_spin.setValue(self.current_ellipse['position'])
-            self.style_text_editor.size_spin.setValue(self.current_ellipse['size'])
-            self.style_text_editor.width_spin.setValue(self.current_ellipse['width'])
+            # 计算新的缩放比例
+            new_zoom = self.zoom_factor * zoom_delta
             
-            self.style_text_editor.position_spin.blockSignals(False)
-            self.style_text_editor.size_spin.blockSignals(False)
-            self.style_text_editor.width_spin.blockSignals(False)
-            
-            # 更新StyleTextEditor中的标记数据
-            for (start, end), style in self.style_text_editor.text_marks.items():
-                if (start == self.current_ellipse['start'] and 
-                    end == self.current_ellipse['end'] and 
-                    style['type'] == 'ellipse'):
-                    # 更新现有标记的属性
-                    style.update({
-                        'position': self.current_ellipse['position'],
-                        'size': self.current_ellipse['size'],
-                        'width': self.current_ellipse['width']
-                    })
-                    break
-            
-            # 触发重新生成图片
-            self.style_text_editor.style_applied.emit()
-
-    def update_ellipse_marks(self, marks):
-        """更新椭圆和下划线标记信息"""
-        self.ellipse_marks = []
-        self.underline_marks = []
-        for (start, end), style in marks.items():
-            if style['type'] == 'ellipse':
-                self.ellipse_marks.append({
-                    'start': start,
-                    'end': end,
-                    'position': style.get('position', 0),
-                    'size': style.get('size', 10),
-                    'width': style.get('width', 2),
-                    'color': style.get('color', '#000000')
-                })
-            elif style['type'] == 'underline':
-                self.underline_marks.append({
-                    'start': start,
-                    'end': end,
-                    'width': style.get('width', 2),
-                    'offset': style.get('offset', 5),
-                    'color': style.get('color', '#000000')
-                })
+            # 限制缩放范围
+            if self.min_zoom <= new_zoom <= self.max_zoom:
+                self.zoom_factor = new_zoom
+                self.update_preview_size()
+                event.accept()
+                return
+                
+        super().wheelEvent(event)
