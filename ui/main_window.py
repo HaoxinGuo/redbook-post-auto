@@ -30,6 +30,7 @@ from PIL import ImageFont
 import sys
 import tempfile
 import time
+from ui.markdown_editor import MarkdownEditor  # 添加导入
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -125,6 +126,10 @@ class MainWindow(QMainWindow):
         
         # 添加样式文本编辑标签页
         self.tabs.addTab(self.style_text_tab, "封面编辑")
+        
+        # 添加Markdown编辑标签页
+        self.markdown_tab = MarkdownEditor()
+        self.tabs.addTab(self.markdown_tab, "Markdown导入")
         
         # 右侧预览面板
         right_panel = QWidget()
@@ -409,6 +414,15 @@ class MainWindow(QMainWindow):
                 self.current_images = [image]
                 print("图片生成完成")
                 
+            elif current_tab == self.markdown_tab:
+                print("处理Markdown内容")
+                content = self.markdown_tab.get_all_content()
+                self.current_images = self.image_generator.create_images(
+                    content,
+                    bg_path,
+                    style['font_style']
+                )
+                
             else:
                 print("处理普通文本编辑内容")
                 content = self.text_editor.get_all_content()
@@ -681,7 +695,7 @@ class MainWindow(QMainWindow):
                     Qt.TransformationMode.SmoothTransformation
                 )
                 
-                # 显示预��
+                # 显示预
                 self.preview_label.setPixmap(scaled_pixmap)
                 print("背景图片加载成功")
             else:
