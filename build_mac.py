@@ -43,6 +43,8 @@ def build_mac_app():
         '--hidden-import=PIL',
         '--hidden-import=PyQt6',
         '--hidden-import=aiohttp',
+        '--hidden-import=markdown',  # 添加markdown解析模块
+        '--hidden-import=ui.markdown_editor',  # 添加markdown编辑器模块
         
         # 添加资源文件
         '--add-data=resources:resources',

@@ -57,6 +57,8 @@ def main():
         '--hidden-import=PyQt6.QtWidgets',
         '--hidden-import=ui.styles',
         '--hidden-import=ui.style_text_editor',
+        '--hidden-import=ui.markdown_editor',  # 添加markdown编辑器模块
+        '--hidden-import=markdown',  # 添加markdown解析模块
         '--hidden-import=PIL',
         '--clean',  # 清理临时文件
         '--noconfirm',  # 不确认覆盖
