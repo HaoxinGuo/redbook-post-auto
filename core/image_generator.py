@@ -88,7 +88,7 @@ class ImageGenerator:
             current_page_content = []
             current_y = self.margin
             
-            while remaining_content and current_y < self.height - self.margin:
+            while remaining_content:
                 # 获取下一个内容块
                 item = remaining_content[0]
                 if not item.get('text', '').strip():
@@ -119,18 +119,29 @@ class ImageGenerator:
                 used_lines = []
                 
                 for line in wrapped_lines:
-                    line_height = line_spacing
+                    # 计算当前行需要的高度
+                    if line == '\n':
+                        line_height = line_spacing // 2
+                    else:
+                        line_height = line_spacing
+                    
+                    # 检查是否还有足够空间
                     if total_height + line_height <= available_height:
                         used_lines.append(line)
                         total_height += line_height
                     else:
+                        # 如果这是块的第一行且放不下，直接创建新页面
+                        if not used_lines:
+                            break
+                        # 否则保存已处理的行，剩余的留到下一页
                         break
                 
                 # 如果当前页面能放下一些内容
                 if used_lines:
+                    # 创建新的内容块，保持原始的换行格式
                     partial_content = {
                         'type': item['type'],
-                        'text': '\n'.join(used_lines),
+                        'text': '\n'.join(used_lines) if used_lines else '',
                         'line_spacing': line_spacing,
                         'font_size': font_size
                     }
@@ -542,7 +553,7 @@ class ImageGenerator:
         lines = []
         
         if list_match:
-            # 列表项处理
+            # 列��项处理
             indent = list_match.group(1)  # 缩进
             marker = list_match.group(2)  # 列表标记
             content = list_match.group(4)  # 实际内容
@@ -799,7 +810,7 @@ class ImageGenerator:
             
             print(f"\n=== 创建字体 ===")
             print(f"字体大小: {size}")
-            print(f"是���加: {is_bold}")
+            print(f"是加: {is_bold}")
             print(f"选择字体文件: {font_name}")
             
             # 获取字体路径
