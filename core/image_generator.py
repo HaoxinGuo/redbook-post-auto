@@ -429,7 +429,7 @@ class ImageGenerator:
         ]
         unordered_patterns = [
             r'[-•*]\s+(.+)',        # 常规无序列表标记
-            r'[○◆◇]\s+(.+)'      # 其他无序列表标记
+            r'[○◆◇]\s+(.+)'      # 其他无列表标记
         ]
         
         def get_indent_level(line):
@@ -530,17 +530,23 @@ class ImageGenerator:
         return '\n'.join(processed_lines)
     
     def get_wrapped_text(self, text, font, max_width):
-        """将文本按照最大宽度换行，支持列表格式"""
+        """将文本按照最大宽度换行，支持列表格式和前导空格"""
         def get_next_break_point(text, start_idx, current_width, max_width):
             """找下一个合适的换行点"""
             width = current_width
             i = start_idx
+            
+            # 计算前导空格的宽度
+            while i < len(text) and text[i].isspace():
+                width += font.getlength(text[i])
+                i += 1
             
             while i < len(text):
                 char = text[i]
                 char_width = font.getlength(char)
                 
                 if width + char_width > max_width:
+                    # 如果是第一个字符就超出宽度，至少返回这个字符的位置
                     return i if i > start_idx else i + 1
                 
                 width += char_width
@@ -553,7 +559,7 @@ class ImageGenerator:
         lines = []
         
         if list_match:
-            # 列��项处理
+            # 列表项处理
             indent = list_match.group(1)  # 缩进
             marker = list_match.group(2)  # 列表标记
             content = list_match.group(4)  # 实际内容
@@ -578,7 +584,7 @@ class ImageGenerator:
                         available_width if first_line else max_width - len(marker) * font.getlength(' ')
                     )
                     
-                    # 添加行
+                    # 添加行，保留前导空格
                     line = paragraph[start_idx:break_point]
                     if line:
                         prefix = marker if first_line else ' ' * len(marker)
@@ -590,7 +596,7 @@ class ImageGenerator:
                 
                 # 在段落之间添加空行标记
                 if paragraph != paragraphs[-1]:
-                    lines.append('\n')  # 使用换行符作为硬换行标记
+                    lines.append('\n')
         else:
             # 处理普通段落
             paragraphs = text.split('\n')
@@ -598,15 +604,14 @@ class ImageGenerator:
             for i, paragraph in enumerate(paragraphs):
                 # 处理空行
                 if not paragraph.strip():
-                    # 只有当不是第一行且前一行不是空行时才添加换行标记
                     if i > 0 and paragraphs[i-1].strip():
                         lines.append('\n')
                     continue
                 
-                # 处理非空段落
+                # 处理非���段落
                 start_idx = 0
                 while start_idx < len(paragraph):
-                    # 获取下一个换行点
+                    # 获取下一个换行点，保留前导空格
                     break_point = get_next_break_point(
                         paragraph,
                         start_idx,
@@ -614,9 +619,9 @@ class ImageGenerator:
                         max_width
                     )
                     
-                    # 添加行
+                    # 添加行，保留所有空格
                     line = paragraph[start_idx:break_point]
-                    if line:
+                    if line or line.isspace():  # 修改这里以保留纯空格的行
                         lines.append(line)
                     
                     # 更新开始位置
@@ -625,7 +630,7 @@ class ImageGenerator:
                 # 在非空段落之间添加换行标记
                 if i < len(paragraphs) - 1 and paragraphs[i+1].strip():
                     lines.append('\n')
-    
+
         self.logger.debug("处理后的行:")
         for i, line in enumerate(lines):
             self.logger.debug(f"第 {i+1} 行: '{line}'")
@@ -638,7 +643,8 @@ class ImageGenerator:
         last_item_type = None  # 记录上一个内容块的类型
         
         for item in text_content:
-            if not item.get('text', '').strip():
+            # 修改这里：不跳过只包含空格的内容
+            if not item.get('text'):  # 只跳过完全为空的内容
                 continue
             
             font_size = item.get('font_size', 48 if item['type'] == 'title' else 32)
@@ -670,16 +676,22 @@ class ImageGenerator:
                     continue
                 
                 # 计算每行的实际宽度（包括前导空格）
-                text_width = sum(current_font.getlength(char) for char in line)
+                text_width = 0
+                x = self.margin  # 起始 x 坐标
                 
-                # 计算文本位置
                 if alignment == 'center':
+                    # 对于居中对齐，先计算整行宽度
+                    text_width = sum(current_font.getlength(char) for char in line)
                     x = (self.width - text_width) // 2
-                else:
-                    x = self.margin
                 
                 try:
-                    draw.text((x, current_y), line, font=current_font, fill='black')
+                    # 逐字符渲染，包括空格
+                    current_x = x
+                    for char in line:
+                        char_width = current_font.getlength(char)
+                        draw.text((current_x, current_y), char, font=current_font, fill='black')
+                        current_x += char_width
+                    
                     current_y += line_spacing
                 except Exception as e:
                     print(f"渲染文字失败: {str(e)}")
@@ -692,6 +704,7 @@ class ImageGenerator:
     def draw_styled_text(self, draw, text, marks, x, y, font, char_spacing=0, line_spacing=20):
         """绘制带样式的文本"""
         char_width = font.getlength("测")  # 使用一个汉字宽度作为参考
+        space_width = font.getlength(" ")  # 获取空格的宽度
         line_height = font.size + line_spacing / 3  # 行高等于字体大小加行间距
         
         # 计算每行最大宽度（考虑右边距）
@@ -705,19 +718,28 @@ class ImageGenerator:
         # 从左边距开始
         x = self.margin
         
+        # 分行处理文本
         for i, char in enumerate(text):
-            if char.strip():
-                char_full_width = char_width + char_spacing
-                # 检查是否需要换行
-                if current_width + char_full_width > max_width:
-                    # 当前行已满，开始新行
-                    if current_line:  # 确保当前行有内容
-                        lines.append((current_line, current_width))
-                        current_line = []
-                        current_width = 0
-                # 添加字符到当前行
-                current_line.append((i, char))
-                current_width += char_full_width
+            if char == '\n':  # 处理换行符
+                if current_line:
+                    lines.append((current_line, current_width))
+                    current_line = []
+                    current_width = 0
+                continue
+            
+            # 计算字符宽度（包括空格）
+            char_full_width = font.getlength(char) + char_spacing
+            
+            # 检查是否需要换行
+            if current_width + char_full_width > max_width and current_line:
+                # 当前行已满，开始新行
+                lines.append((current_line, current_width))
+                current_line = []
+                current_width = 0
+            
+            # 添加字符到当前行
+            current_line.append((i, char))
+            current_width += char_full_width
         
         # 添加最后一行
         if current_line:
@@ -757,13 +779,15 @@ class ImageGenerator:
         # 绘制文字和其他样式
         for line_idx, (line_chars, line_width) in enumerate(lines):
             current_y = start_y + line_idx * line_height
+            current_x = x  # 重置到左边距
             
-            # 收集每行的下划线息
+            # 收集每行的下划线信息
             underlines = []
             current_underline = None
             
             for char_idx, (text_idx, char) in enumerate(line_chars):
-                current_x = x + char_idx * (char_width + char_spacing)
+                # 计算每个字符的实际宽度
+                actual_width = font.getlength(char)
                 
                 # 检查下划线样式
                 for (start, end), style in marks.items():
@@ -775,15 +799,18 @@ class ImageGenerator:
                                 'width': style.get('width', 2),
                                 'offset': style.get('offset', 5)
                             }
-                        current_underline['end_x'] = current_x + char_width
+                        current_underline['end_x'] = current_x + actual_width
                         break
                 else:
                     if current_underline is not None:
                         underlines.append(current_underline)
                         current_underline = None
                 
-                # 绘制文字
+                # 绘制文字（包括空格）
                 draw.text((current_x, current_y), char, font=font, fill='black')
+                
+                # 更新 x 坐标，考虑字间距
+                current_x += actual_width + char_spacing
             
             # 添加最后一个下划线
             if current_underline is not None:

@@ -101,9 +101,11 @@ class TextBlock(QWidget):
             """)
 
     def get_content(self):
-        """获取文本内容，保留用户手动输入的换行符，忽略自动软换行"""
+        """获取文本内容，保留用户手动输入的换行符和前导空格"""
         # 获取原始文本内容
         text = self.editor.toPlainText()
+        print("\n=== 获取文本内容 ===")
+        print(f"原始文本:\n{repr(text)}")
         
         # 获取文档对象
         doc = self.editor.document()
@@ -114,7 +116,10 @@ class TextBlock(QWidget):
         while block.isValid():
             # 检查这个文本块是否是由软换行产生的
             if block.layout().lineCount() > 0:
+                # 获取完整的文本行，包括前导空格
                 line = block.text()
+                print(f"块 {block.blockNumber()} 内容: {repr(line)}")
+                
                 # 只有当这个块是由用户手动换行产生的时候，才添加换行符
                 if block.blockNumber() < doc.blockCount() - 1:
                     real_text.append(line + '\n')
@@ -124,6 +129,7 @@ class TextBlock(QWidget):
         
         # 合并文本
         final_text = ''.join(real_text)
+        print(f"最终文本:\n{repr(final_text)}")
         
         return {
             'type': 'title' if self.type_combo.currentText() == "标题" else 'content',
@@ -296,15 +302,10 @@ class TextEditor(QWidget):
             
             # 获取原始文本内容
             raw_text = block.editor.toPlainText()
-            logger.info(f"原始文本内容: {repr(raw_text)}")  # 使用repr显示转义字符
-            logger.info(f"原始文本长度: {len(raw_text)}")
-            logger.info(f"原始文本中换行符数量: {raw_text.count('\n')}")
-            logger.info(f"原始文本中\\r\\n数量: {raw_text.count('\r\n')}")
+            logger.info(f"原始文本内容: {repr(raw_text)}")
             
             # 统一换行符为 \n
             text = raw_text.replace('\r\n', '\n').replace('\r', '\n')
-            logger.info(f"统一换行符后的文本: {repr(text)}")
-            logger.info(f"处理后的换行符数量: {text.count('\n')}")
             
             # 处理每一行
             lines = text.split('\n')
@@ -312,11 +313,11 @@ class TextEditor(QWidget):
             for j, line in enumerate(lines):
                 logger.info(f"  行 {j+1}: {repr(line)}")
                 logger.info(f"  行 {j+1} 长度: {len(line)}")
-                logger.info(f"  行 {j+1} 前后空白: 前[{len(line) - len(line.lstrip())}] 后[{len(line) - len(line.rstrip())}]")
+                logger.info(f"  行 {j+1} 前导空格数: {len(line) - len(line.lstrip())}")
             
-            # 处理空白字符，保留换行
-            text = '\n'.join(line.strip() for line in lines)
-            logger.info(f"处理空白后的文本: {repr(text)}")
+            # 保留原始文本，包括前导空格，只去掉尾部空格
+            text = '\n'.join(line.rstrip() for line in lines)
+            logger.info(f"处理后的文本: {repr(text)}")
             
             item = {
                 'type': 'title' if block.type_combo.currentText() == "标题" else 'content',
@@ -328,10 +329,6 @@ class TextEditor(QWidget):
                 item['font_size'] = self.title_font_spin.value()
             else:
                 item['font_size'] = self.content_font_spin.value()
-            
-            logger.info(f"文本块类型: {item['type']}")
-            logger.info(f"字体大小: {item['font_size']}")
-            logger.info(f"行间距: {item['line_spacing']}")
             
             if text.strip():  # 只添加非空内容
                 content.append(item)
