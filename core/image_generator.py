@@ -328,7 +328,7 @@ class ImageGenerator:
         
         # 创建字体对象，传入加粗参数
         font = self.create_font(font_size, is_bold)
-        print(f"字体对象创建结果: {font}")
+        print(f"体对象创建结果: {font}")
         
         # 绘制文字
         self.draw_styled_text(
@@ -368,18 +368,18 @@ class ImageGenerator:
                 logo = logo.resize((logo_width, logo_height), Image.Resampling.LANCZOS)
                 print(f"调整后的 Logo 尺寸: {logo.size}")
                 
-                # 计算 logo 位置（左下角，留出边��）
+                # 计算 logo 位置（左下角，留出边距）
                 margin = 40  # 边距
                 x = margin
                 y = self.height - logo_height - margin
                 print(f"Logo 位置: ({x}, {y})")
                 
-                # 如果 logo 有透明通，需要特殊处理
+                # 如果 logo 有透明通道，需要特殊处理
                 if logo.mode == 'RGBA':
                     print("处理带透明通道的 Logo")
                     # 将原图转换为 RGBA 模式
                     image = image.convert('RGBA')
-                    # 创建一个与原图大小相同的透明图层
+                    # 创建一个与原图大小相的透明图层
                     overlay = Image.new('RGBA', image.size, (0, 0, 0, 0))
                     # 将 logo 粘贴到透明图层上
                     overlay.paste(logo, (x, y))
@@ -529,7 +529,6 @@ class ImageGenerator:
                 char = text[i]
                 char_width = font.getlength(char)
                 
-                # 如果加上这个字符会超过最大宽度，就在当前位置换行
                 if width + char_width > max_width:
                     return i if i > start_idx else i + 1
                 
@@ -557,9 +556,6 @@ class ImageGenerator:
             first_line = True
             
             for paragraph in paragraphs:
-                if not paragraph.strip():
-                    continue
-                
                 # 处理段落
                 start_idx = 0
                 while start_idx < len(paragraph):
@@ -580,15 +576,23 @@ class ImageGenerator:
                     
                     # 更新开始位置
                     start_idx = break_point
+                
+                # 在段落之间添加空行标记
+                if paragraph != paragraphs[-1]:
+                    lines.append('\n')  # 使用换行符作为硬换行标记
         else:
             # 处理普通段落
             paragraphs = text.split('\n')
             
-            for paragraph in paragraphs:
+            for i, paragraph in enumerate(paragraphs):
+                # 处理空行
                 if not paragraph.strip():
+                    # 只有当不是第一行且前一行不是空行时才添加换行标记
+                    if i > 0 and paragraphs[i-1].strip():
+                        lines.append('\n')
                     continue
                 
-                # 处理段落
+                # 处理非空段落
                 start_idx = 0
                 while start_idx < len(paragraph):
                     # 获取下一个换行点
@@ -606,6 +610,10 @@ class ImageGenerator:
                     
                     # 更新开始位置
                     start_idx = break_point
+                
+                # 在非空段落之间添加换行标记
+                if i < len(paragraphs) - 1 and paragraphs[i+1].strip():
+                    lines.append('\n')
     
         self.logger.debug("处理后的行:")
         for i, line in enumerate(lines):
@@ -638,15 +646,16 @@ class ImageGenerator:
             
             # 每次渲染时重新计算换行
             max_width = self.width - (self.margin * 2)
-            text = item['text']  # 不再使用 strip()，保留原始空格
+            text = item['text']
             lines = self.get_wrapped_text(text, current_font, max_width)
             
             for line in lines:
                 if current_y + line_spacing > self.height - self.margin:
                     return False
                 
-                # 忽略完全空的行，但保留只有空格的行
-                if not line:
+                # 处理硬换行
+                if line == '\n':
+                    current_y += line_spacing // 2  # 硬换行添加半个行间距
                     continue
                 
                 # 计算每行的实际宽度（包括前导空格）
@@ -659,7 +668,6 @@ class ImageGenerator:
                     x = self.margin
                 
                 try:
-                    # 不再使用 strip()，保留原始空格
                     draw.text((x, current_y), line, font=current_font, fill='black')
                     current_y += line_spacing
                 except Exception as e:
@@ -791,7 +799,7 @@ class ImageGenerator:
             
             print(f"\n=== 创建字体 ===")
             print(f"字体大小: {size}")
-            print(f"是否加: {is_bold}")
+            print(f"是���加: {is_bold}")
             print(f"选择字体文件: {font_name}")
             
             # 获取字体路径
