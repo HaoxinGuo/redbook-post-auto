@@ -69,8 +69,10 @@ class ImageGenerator:
         images = []
         remaining_content = text_content.copy()
         
-        self.logger.info("=== 开始生成图片 ===")
+        self.logger.info("\n=== 开始生成图片 ===")
         self.logger.info(f"总内容块数: {len(text_content)}")
+        self.logger.info("字体样式: %s", font_style)
+        self.logger.info("背景路径: %s", background_path)
         
         while remaining_content:
             # 创建新页面
@@ -88,6 +90,7 @@ class ImageGenerator:
             current_page_content = []
             current_y = self.margin
             
+            self.logger.info("\n处理新页面:")
             while remaining_content:
                 # 获取下一个内容块
                 item = remaining_content[0]
@@ -95,12 +98,17 @@ class ImageGenerator:
                     remaining_content.pop(0)
                     continue
                 
+                self.logger.debug(f"\n处理内容块:")
+                self.logger.debug(f"类型: {item['type']}")
+                self.logger.debug(f"原始文本:\n{item['text']}")
+                
                 # 设置字体
                 font_size = item.get('font_size', 48 if item['type'] == 'title' else 32)
                 line_spacing = item.get('line_spacing', 45)
                 
                 try:
                     current_font = ImageFont.truetype(self.fonts[font_style].path, font_size)
+                    self.logger.debug(f"字体加载成功: size={font_size}")
                 except Exception as e:
                     self.logger.error(f"字体加载失败: {str(e)}")
                     remaining_content.pop(0)
@@ -108,10 +116,13 @@ class ImageGenerator:
                 
                 # 计算可用高度
                 available_height = self.height - current_y - self.margin
+                self.logger.debug(f"可用高度: {available_height}")
                 
                 # 获取文本的实际换行
                 text = item['text']
                 max_width = self.width - (self.margin * 2)
+                
+                self.logger.debug("\n开始文本换行处理:")
                 wrapped_lines = self.get_wrapped_text(text, current_font, max_width)
                 
                 # 计算这些行实际需要的高度
@@ -135,6 +146,8 @@ class ImageGenerator:
                             break
                         # 否则保存已处理的行，剩余的留到下一页
                         break
+                
+                self.logger.debug(f"\n当前页面可容纳行数: {len(used_lines)}")
                 
                 # 如果当前页面能放下一些内容
                 if used_lines:
@@ -160,24 +173,27 @@ class ImageGenerator:
                         remaining_content.pop(0)
                     
                     current_y += total_height
+                    self.logger.debug(f"更新当前Y坐标: {current_y}")
                 else:
                     # 如果一行都放不下，创建新页面
+                    self.logger.debug("当前页面空间不足，准备创建新页面")
                     break
             
             # 渲染当前页面的内容
             if current_page_content:
+                self.logger.info(f"\n渲染当前页面，内容块数: {len(current_page_content)}")
                 self.render_text(draw, current_page_content, self.fonts[font_style])
                 images.append(image)
                 self.logger.info(f"完成第 {len(images)} 页")
+            
+            # 添加Logo
+            try:
+                self.add_logo_to_images(images)
+                self.logger.info("Logo添加成功")
+            except Exception as e:
+                self.logger.error(f"Logo添加失败: {str(e)}")
         
-        # 添加Logo
-        try:
-            self.add_logo_to_images(images)
-            self.logger.info("Logo添加成功")
-        except Exception as e:
-            self.logger.error(f"Logo添加失败: {str(e)}")
-        
-        self.logger.info(f"=== 图片生成完成，共 {len(images)} 页 ===")
+        self.logger.info(f"\n=== 图片生成完成，共 {len(images)} 页 ===\n")
         return images
     
     def calculate_content_height(self, content_items, font):
@@ -385,7 +401,7 @@ class ImageGenerator:
                 y = self.height - logo_height - margin
                 print(f"Logo 位置: ({x}, {y})")
                 
-                # 如果 logo 有透明通道，需要特殊处理
+                # ���果 logo 有透明通道，需要特殊处理
                 if logo.mode == 'RGBA':
                     print("处理带透明通道的 Logo")
                     # 将原图转换为 RGBA 模式
