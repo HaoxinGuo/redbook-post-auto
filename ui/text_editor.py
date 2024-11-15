@@ -1,6 +1,10 @@
 from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QTextEdit, QPushButton, 
                            QHBoxLayout, QComboBox, QLabel, QSpinBox, QScrollArea)
 from PyQt6.QtCore import Qt, pyqtSignal
+import logging
+import os
+from datetime import datetime
+import sys
 
 class TextBlock(QWidget):
     deleted = pyqtSignal(object)  # 删除信号
@@ -29,6 +33,9 @@ class TextBlock(QWidget):
 
         # 文本编辑框
         self.editor = QTextEdit()
+        # 启用自动换行，但使用单词边界
+        self.editor.setLineWrapMode(QTextEdit.LineWrapMode.WidgetWidth)
+        self.editor.setAcceptRichText(False)  # 只接受纯文本
         # 设置文本编辑框的样式
         self.editor.setStyleSheet("""
             QTextEdit {
@@ -94,14 +101,39 @@ class TextBlock(QWidget):
             """)
 
     def get_content(self):
+        """获取文本内容，保留用户手动输入的换行符，忽略自动软换行"""
+        # 获取原始文本内容
+        text = self.editor.toPlainText()
+        
+        # 获取文档对象
+        doc = self.editor.document()
+        
+        # 收集实际文本内容
+        real_text = []
+        block = doc.begin()
+        while block.isValid():
+            # 检查这个文本块是否是由软换行产生的
+            if block.layout().lineCount() > 0:
+                line = block.text()
+                # 只有当这个块是由用户手动换行产生的时候，才添加换行符
+                if block.blockNumber() < doc.blockCount() - 1:
+                    real_text.append(line + '\n')
+                else:
+                    real_text.append(line)
+            block = block.next()
+        
+        # 合并文本
+        final_text = ''.join(real_text)
+        
         return {
             'type': 'title' if self.type_combo.currentText() == "标题" else 'content',
-            'text': self.editor.toPlainText()
+            'text': final_text
         }
 
     def set_content(self, content):
-        self.type_combo.setCurrentText("标题" if content['type'] == 'title' else "内容")
-        self.editor.setPlainText(content['text'])
+        # 设置文本内容，保持原有的换行
+        self.editor.setPlainText(content.get('text', ''))
+        self.type_combo.setCurrentText("标题" if content.get('type') == 'title' else "内容")
 
 class TextEditor(QWidget):
     content_changed = pyqtSignal()  # 内容变化信号
@@ -175,7 +207,7 @@ class TextEditor(QWidget):
         content_layout.setContentsMargins(0, 0, 0, 0)
         content_layout.setSpacing(10)
 
-        # 创建文本块容器
+        # 创文本块容器
         self.blocks_container = QWidget()
         self.blocks_layout = QVBoxLayout(self.blocks_container)
         self.blocks_layout.setContentsMargins(0, 0, 0, 0)
@@ -225,16 +257,89 @@ class TextEditor(QWidget):
 
     def get_all_content(self):
         """获取所有内容，包括行间距和字体大小设置"""
-        content = [block.get_content() for block in self.text_blocks]
-        # 添加行间距和字体大小信息
-        for item in content:
-            item['line_spacing'] = self.line_spacing_spin.value()
+        content = []
+        
+        # 设置日志
+        logger = logging.getLogger('TextEditor')
+        logger.setLevel(logging.DEBUG)
+        
+        # 检查是否已经有处理器
+        if not logger.handlers:
+            # 创建logs目录
+            if not os.path.exists('logs'):
+                os.makedirs('logs')
+            
+            # 生成日志文件名，包含时间戳
+            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+            log_file = os.path.join('logs', f'text_editor_{timestamp}.log')
+            
+            # 添加文件处理器
+            file_handler = logging.FileHandler(log_file, encoding='utf-8')
+            file_handler.setLevel(logging.DEBUG)
+            
+            # 添加控制台处理器
+            console_handler = logging.StreamHandler(sys.stdout)
+            console_handler.setLevel(logging.DEBUG)
+            
+            # 设置日志格式
+            formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+            file_handler.setFormatter(formatter)
+            console_handler.setFormatter(formatter)
+            
+            logger.addHandler(file_handler)
+            logger.addHandler(console_handler)
+        
+        logger.info("=== 开始获取文本内容 ===")
+        
+        for i, block in enumerate(self.text_blocks):
+            logger.info(f"\n处理文本块 {i+1}:")
+            
+            # 获取原始文本内容
+            raw_text = block.editor.toPlainText()
+            logger.info(f"原始文本内容: {repr(raw_text)}")  # 使用repr显示转义字符
+            logger.info(f"原始文本长度: {len(raw_text)}")
+            logger.info(f"原始文本中换行符数量: {raw_text.count('\n')}")
+            logger.info(f"原始文本中\\r\\n数量: {raw_text.count('\r\n')}")
+            
+            # 统一换行符为 \n
+            text = raw_text.replace('\r\n', '\n').replace('\r', '\n')
+            logger.info(f"统一换行符后的文本: {repr(text)}")
+            logger.info(f"处理后的换行符数量: {text.count('\n')}")
+            
+            # 处理每一行
+            lines = text.split('\n')
+            logger.info(f"分割后的行数: {len(lines)}")
+            for j, line in enumerate(lines):
+                logger.info(f"  行 {j+1}: {repr(line)}")
+                logger.info(f"  行 {j+1} 长度: {len(line)}")
+                logger.info(f"  行 {j+1} 前后空白: 前[{len(line) - len(line.lstrip())}] 后[{len(line) - len(line.rstrip())}]")
+            
+            # 处理空白字符，保留换行
+            text = '\n'.join(line.strip() for line in lines)
+            logger.info(f"处理空白后的文本: {repr(text)}")
+            
+            item = {
+                'type': 'title' if block.type_combo.currentText() == "标题" else 'content',
+                'text': text,
+                'line_spacing': self.line_spacing_spin.value()
+            }
+            
             if item['type'] == 'title':
                 item['font_size'] = self.title_font_spin.value()
-                print(f"设置标题字体大小: {self.title_font_spin.value()}")
             else:
                 item['font_size'] = self.content_font_spin.value()
-                print(f"设置内容字体大小: {self.content_font_spin.value()}")
+            
+            logger.info(f"文本块类型: {item['type']}")
+            logger.info(f"字体大小: {item['font_size']}")
+            logger.info(f"行间距: {item['line_spacing']}")
+            
+            if text.strip():  # 只添加非空内容
+                content.append(item)
+                logger.info("文本块已添加到内容列表")
+            else:
+                logger.info("跳过空文本块")
+        
+        logger.info(f"\n=== 文本内容获取完成，共 {len(content)} 个内容块 ===")
         return content
 
     def set_all_content(self, content_list):
