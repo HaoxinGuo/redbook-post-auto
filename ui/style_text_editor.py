@@ -150,7 +150,7 @@ class StyleTextEditor(QWidget):
         self.position_spin.setFixedWidth(80)  # 设置固定宽度
         self.position_spin.setFixedHeight(30)
         self.position_spin.setRange(-20, 20)
-        self.position_spin.setValue(0)
+        self.position_spin.setValue(10)
         self.position_spin.setToolTip("调整椭圆的垂直位置")
         
         size_label = QLabel("大小：")
@@ -167,7 +167,7 @@ class StyleTextEditor(QWidget):
         self.width_spin.setFixedWidth(80)  # 设置固定宽度
         self.width_spin.setFixedHeight(30)
         self.width_spin.setRange(1, 100)
-        self.width_spin.setValue(15)
+        self.width_spin.setValue(25)
         self.width_spin.setToolTip("调整椭圆线条的粗细")
         
         self.color_button = QPushButton("选择颜色")
@@ -199,7 +199,7 @@ class StyleTextEditor(QWidget):
         self.underline_width_spin.setFixedWidth(80)  # 设置固定宽度
         self.underline_width_spin.setFixedHeight(30)
         self.underline_width_spin.setRange(1, 50)
-        self.underline_width_spin.setValue(15)
+        self.underline_width_spin.setValue(25)
         self.underline_width_spin.setToolTip("调整下划线的粗细")
         
         underline_offset_label = QLabel("距离：")
@@ -235,7 +235,7 @@ class StyleTextEditor(QWidget):
         separator.setFrameShadow(QFrame.Shadow.Sunken)
         layout.addWidget(separator)
 
-        # 添加字��距和行间距控制面板
+        # 添加字间距和行间距控制面板
         spacing_control = QWidget()
         spacing_layout = QHBoxLayout(spacing_control)
         spacing_layout.setContentsMargins(0, 0, 0, 0)
@@ -246,7 +246,7 @@ class StyleTextEditor(QWidget):
         self.char_spacing_spin.setFixedWidth(80)  # 设置固定宽度
         self.char_spacing_spin.setFixedHeight(30)
         self.char_spacing_spin.setRange(0, 100)
-        self.char_spacing_spin.setValue(40)
+        self.char_spacing_spin.setValue(10)
         self.char_spacing_spin.setToolTip("调整字符之间的间距")
         
         # 行间距控制

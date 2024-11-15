@@ -379,7 +379,7 @@ class ImageGenerator:
                 logo = logo.resize((logo_width, logo_height), Image.Resampling.LANCZOS)
                 print(f"调整后的 Logo 尺寸: {logo.size}")
                 
-                # 计算 logo 位置（左下角，留出边距）
+                # 计算 logo 置（左下角，留边距）
                 margin = 40  # 边距
                 x = margin
                 y = self.height - logo_height - margin
@@ -554,25 +554,39 @@ class ImageGenerator:
             
             return i
 
-        # 检查是否是列表项
-        list_match = re.match(r'^(\s*)((\d+[.、)]|[a-z][.、)]|\s*[-•*])\s+)(.+)$', text)
+        # 检查是否是列表项，扩展匹配模式以支持多种列表标记
+        list_match = re.match(r'^(\s*)((?:\d+[.、)]|[a-z][.、)]|[-•*])\s+)(.+)$', text)
         lines = []
         
         if list_match:
             # 列表项处理
             indent = list_match.group(1)  # 缩进
             marker = list_match.group(2)  # 列表标记
-            content = list_match.group(4)  # 实际内容
+            content = list_match.group(3)  # 实际内容
             
             # 计算列表标记的实际宽度
             marker_width = sum(font.getlength(c) for c in marker)
-            available_width = max_width - marker_width
+            
+            # 计算后续行的缩进宽度（缩进 + 标记的宽度）
+            indent_width = sum(font.getlength(' ') for _ in range(len(indent)))
+            total_indent_width = indent_width + marker_width
+            
+            # 计算可用宽度
+            available_width = max_width - total_indent_width
             
             # 处理内容部分
             paragraphs = content.split('\n')
             first_line = True
             
             for paragraph in paragraphs:
+                # 检查段落是否是新的列表项
+                sub_list_match = re.match(r'^(\s*)((?:\d+[.、)]|[a-z][.、)]|[-•*])\s+)(.+)$', paragraph)
+                if sub_list_match and not first_line:
+                    # 如果是新的列表项，递归处理
+                    sub_lines = self.get_wrapped_text(paragraph, font, max_width)
+                    lines.extend(sub_lines)
+                    continue
+                    
                 # 处理段落
                 start_idx = 0
                 while start_idx < len(paragraph):
@@ -580,16 +594,23 @@ class ImageGenerator:
                     break_point = get_next_break_point(
                         paragraph, 
                         start_idx, 
-                        0, 
-                        available_width if first_line else max_width - len(marker) * font.getlength(' ')
+                        0,
+                        available_width
                     )
                     
                     # 添加行，保留前导空格
                     line = paragraph[start_idx:break_point]
                     if line:
-                        prefix = marker if first_line else ' ' * len(marker)
-                        lines.append(prefix + line)
-                        first_line = False
+                        if first_line:
+                            # 第一行使用原始缩进和标记
+                            lines.append(indent + marker + line)
+                            first_line = False
+                        else:
+                            # 后续行使用相同宽度的空格缩进
+                            # 计算需要多少个空格来达到相同的缩进宽度
+                            space_width = font.getlength(' ')
+                            indent_spaces = ' ' * (int(total_indent_width / space_width) + 1)
+                            lines.append(indent_spaces + line)
                     
                     # 更新开始位置
                     start_idx = break_point
@@ -602,13 +623,21 @@ class ImageGenerator:
             paragraphs = text.split('\n')
             
             for i, paragraph in enumerate(paragraphs):
+                # 检查是否是列表项
+                list_match = re.match(r'^(\s*)((?:\d+[.、)]|[a-z][.、)]|[-•*])\s+)(.+)$', paragraph)
+                if list_match:
+                    # 如果是列表项，递归处理
+                    sub_lines = self.get_wrapped_text(paragraph, font, max_width)
+                    lines.extend(sub_lines)
+                    continue
+                    
                 # 处理空行
                 if not paragraph.strip():
                     if i > 0 and paragraphs[i-1].strip():
                         lines.append('\n')
                     continue
                 
-                # 处理非���段落
+                # 处理非空段落
                 start_idx = 0
                 while start_idx < len(paragraph):
                     # 获取下一个换行点，保留前导空格
@@ -621,7 +650,7 @@ class ImageGenerator:
                     
                     # 添加行，保留所有空格
                     line = paragraph[start_idx:break_point]
-                    if line or line.isspace():  # 修改这里以保留纯空格的行
+                    if line or line.isspace():  # 保留纯空格的行
                         lines.append(line)
                     
                     # 更新开始位置
@@ -653,7 +682,7 @@ class ImageGenerator:
             
             # 如果当前是内容块且上一个内容块是标题，添加半个行间距
             if last_item_type == 'title' and item['type'] != 'title':
-                current_y += line_spacing // 2
+                current_y += line_spacing // 1.5
             
             try:
                 current_font = ImageFont.truetype(font.path, font_size)
@@ -705,7 +734,7 @@ class ImageGenerator:
         """绘制带样式的文本"""
         char_width = font.getlength("测")  # 使用一个汉字宽度作为参考
         space_width = font.getlength(" ")  # 获取空格的宽度
-        line_height = font.size + line_spacing / 3  # 行高等于字体大小加行间距
+        line_height = font.size + line_spacing / 4  # 行高等于字体大小加行间距
         
         # 计算每行最大宽度（考虑右边距）
         max_width = self.width - (self.margin * 2)
@@ -863,7 +892,7 @@ class ImageGenerator:
                 return ImageFont.truetype("arial.ttf", size)
             except Exception as e2:
                 print(f"加载系统默认字体也败: {str(e2)}")
-                print("使用 PIL 默认字体")
+                print("使 PIL 默认字体")
                 return ImageFont.load_default()
     
     def add_logo_to_images(self, images):
