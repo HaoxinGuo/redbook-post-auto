@@ -165,7 +165,7 @@ class TextEditor(QWidget):
         self.title_font_spin.setFixedWidth(80)  # 设置固定宽度
         self.title_font_spin.setFixedHeight(30)
         self.title_font_spin.setRange(24, 120)
-        self.title_font_spin.setValue(60)
+        self.title_font_spin.setValue(50)
         self.title_font_spin.setToolTip("调整标题文字的大小")
         
         params_layout.addWidget(title_font_label)
@@ -178,7 +178,7 @@ class TextEditor(QWidget):
         self.content_font_spin.setFixedWidth(80)  # 设置固定宽度
         self.content_font_spin.setFixedHeight(30)
         self.content_font_spin.setRange(24, 96)
-        self.content_font_spin.setValue(48)
+        self.content_font_spin.setValue(36)
         self.content_font_spin.setToolTip("调整内容文字的大小")
         
         params_layout.addWidget(content_font_label)
@@ -191,7 +191,7 @@ class TextEditor(QWidget):
         self.line_spacing_spin.setFixedWidth(80)  # 设置固定宽度
         self.line_spacing_spin.setFixedHeight(30)
         self.line_spacing_spin.setRange(20, 200)
-        self.line_spacing_spin.setValue(65)
+        self.line_spacing_spin.setValue(45)
         self.line_spacing_spin.setToolTip("调整行与行之间的间距")
         
         params_layout.addWidget(line_spacing_label)
