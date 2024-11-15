@@ -39,7 +39,7 @@ class ImageGenerator:
             return {}
         
     def create_images(self, text_content, background_path, font_style='normal'):
-        """生成多页图片"""
+        """生成多页图片，优化空白行处理"""
         images = []
         remaining_content = text_content.copy()
         current_page_content = []
@@ -58,14 +58,13 @@ class ImageGenerator:
             print(f"\n处理内容块:")
             print(f"类型: {item['type']}")
             print(f"内容长度: {len(item.get('text', ''))}")
-            print(f"内容: {item.get('text', '')[:50]}...")
             
             if not item.get('text', '').strip():
                 print("跳过空内容块")
                 remaining_content.pop(0)
                 continue
             
-            # 使用内容块自带的字体大小
+            # 使用内容块自带的字体大小和行间距
             font_size = item.get('font_size')
             if font_size is None:
                 font_size = 48 if item['type'] == 'title' else 32
@@ -84,53 +83,104 @@ class ImageGenerator:
                 remaining_content.pop(0)
                 continue
             
-            # 获取换行后的文本
-            lines = self.get_wrapped_text(item['text'], current_font, self.width - (self.margin * 2))
-            content_height = len(lines) * line_spacing + line_spacing // 2
-            print(f"内容分行数: {len(lines)}")
-            print(f"内容需要高度: {content_height}")
-            print(f"当前页面剩余高度: {self.height - current_y - self.margin}")
+            # 获取文本行，同时处理空白行
+            text_lines = item['text'].split('\n')
+            available_height = self.height - current_y - self.margin
+            used_lines = []
+            actual_height = 0
             
-            # 检查是否需要分页
-            if current_y + content_height > self.height - self.margin:
-                print("\n内容超出当前页")
-                
-                # 计算当前页面剩余可用行数
-                available_height = self.height - current_y - self.margin
-                max_lines = available_height // line_spacing
-                print(f"当前页面可容纳行数: {max_lines}")
-                
-                if max_lines > 0 and (not current_page_content or item['type'] != 'title'):
-                    # 分割内容
-                    first_part = {
-                        'type': item['type'],
-                        'text': '\n'.join(lines[:max_lines]),
-                        'line_spacing': line_spacing,
-                        'font_size': font_size  # 保持字体大小
-                    }
-                    second_part = {
-                        'type': item['type'],
-                        'text': '\n'.join(lines[max_lines:]),
-                        'line_spacing': line_spacing,
-                        'font_size': font_size  # 保持字体大小
-                    }
-                    
-                    print(f"分割为两部分:")
-                    print(f"第一部分长度: {len(first_part['text'])}")
-                    print(f"第二部分长度: {len(second_part['text'])}")
-                    
-                    if first_part['text'].strip():
-                        current_page_content.append(first_part)
-                        print("添加第一部分到当前页面")
-                    
-                    if second_part['text'].strip():
-                        remaining_content[0] = second_part
-                        print("保存第二部分到剩余内容")
-                    else:
-                        remaining_content.pop(0)
-                
+            print(f"可用高度: {available_height}")
+            print(f"总行数: {len(text_lines)}")
+            
+            # 如果是标题且不是第一个内容块，检查是否需要新页面
+            if item['type'] == 'title' and current_page_content:
+                print("标题块且不是第一页，创建新页面")
                 # 创建当前页面
+                image = Image.new('RGB', (self.width, self.height), 'white')
+                if background_path:
+                    try:
+                        bg = Image.open(background_path)
+                        bg = bg.resize((self.width, self.height))
+                        image.paste(bg, (0, 0))
+                        print("背景加载成功")
+                    except Exception as e:
+                        print(f"背景加载失败: {str(e)}")
+                
+                draw = ImageDraw.Draw(image)
+                self.render_text(draw, current_page_content, self.fonts[font_style])
+                images.append(image)
+                
+                # 重置当前页面
+                current_page_content = []
+                current_y = self.margin
+                available_height = self.height - current_y - self.margin
+            
+            for line in text_lines:
+                # 如果是空白行，只占用半个行间距
+                if not line.strip():
+                    if actual_height + line_spacing/2 <= available_height:
+                        used_lines.append('')
+                        actual_height += line_spacing/2
+                        print(f"添加空白行，实际高度: {actual_height}")
+                    else:
+                        break
+                else:
+                    # 对非空白行进行换行处理
+                    max_width = self.width - (self.margin * 2)
+                    char_width = current_font.getlength("测")
+                    max_chars = int(max_width / char_width)
+                    
+                    # 处理长行
+                    if len(line) > max_chars:
+                        wrapped_lines = textwrap.wrap(line, width=max_chars)
+                    else:
+                        wrapped_lines = [line]
+                    
+                    for wrapped_line in wrapped_lines:
+                        if actual_height + line_spacing <= available_height:
+                            used_lines.append(wrapped_line)
+                            actual_height += line_spacing
+                            print(f"添加文本行: {wrapped_line[:30]}...")
+                            print(f"实际高度: {actual_height}")
+                        else:
+                            break
+                    
+                    if actual_height + line_spacing > available_height:
+                        break
+            
+            # 如果当前页面能放下一些内容
+            if used_lines:
+                # 创建当前内容块的部分内容
+                partial_content = {
+                    'type': item['type'],
+                    'text': '\n'.join(used_lines),
+                    'line_spacing': line_spacing,
+                    'font_size': font_size
+                }
+                current_page_content.append(partial_content)
+                
+                # 更新剩余内容
+                remaining_lines = text_lines[len(used_lines):]
+                if remaining_lines:
+                    remaining_content[0] = {
+                        'type': item['type'],
+                        'text': '\n'.join(remaining_lines),
+                        'line_spacing': line_spacing,
+                        'font_size': font_size
+                    }
+                else:
+                    remaining_content.pop(0)
+                
+                current_y += actual_height
+                print(f"更新Y位置到: {current_y}")
+            
+            # 如果已经没有空间或者是最后一个内容块，创建新页面
+            if (not used_lines or 
+                current_y + line_spacing > self.height - self.margin):
+                
                 if current_page_content:
+                    print("\n创建新页面")
+                    # 创建新页面
                     image = Image.new('RGB', (self.width, self.height), 'white')
                     if background_path:
                         try:
@@ -142,7 +192,6 @@ class ImageGenerator:
                             print(f"背景加载失败: {str(e)}")
                     
                     draw = ImageDraw.Draw(image)
-                    print("开始渲染当前页面内容")
                     self.render_text(draw, current_page_content, self.fonts[font_style])
                     images.append(image)
                     print(f"页面完成，当前总页数: {len(images)}")
@@ -151,21 +200,10 @@ class ImageGenerator:
                     current_page_content = []
                     current_y = self.margin
                     print("重置页面状态")
-                
-                continue
-            
-            # 添加内容到当前页面
-            print("\n添加内容到当前页面")
-            current_page_content.append(item)
-            current_y += content_height
-            remaining_content.pop(0)
-            print(f"当前页面内容块数: {len(current_page_content)}")
-            print(f"更新后的Y位置: {current_y}")
         
         # 处理最后一页
         if current_page_content:
             print("\n处理最后一页")
-            print(f"最后一页内容块数: {len(current_page_content)}")
             image = Image.new('RGB', (self.width, self.height), 'white')
             if background_path:
                 try:
@@ -181,47 +219,14 @@ class ImageGenerator:
             images.append(image)
             print(f"最后一页完成，最终总页数: {len(images)}")
         
-        # 在创建每个页面后添加 logo
+        # 添加Logo
         try:
-            # 获取 logo 路径
-            if hasattr(sys, '_MEIPASS'):
-                logo_path = os.path.join(sys._MEIPASS, 'resources/icons', 'logo.png')
-            else:
-                logo_path = os.path.join('resources/icons', 'logo.png')
-            
-            if os.path.exists(logo_path):
-                # 加载 logo
-                logo = Image.open(logo_path)
-                
-                # 设置 logo 大小
-                logo_height = 60
-                aspect_ratio = logo.width / logo.height
-                logo_width = int(logo_height * aspect_ratio)
-                logo = logo.resize((logo_width, logo_height), Image.Resampling.LANCZOS)
-                
-                # 计算 logo 位置
-                margin = 20
-                x = margin
-                y = self.height - logo_height - margin
-                
-                # 为每个图片添加 logo
-                for i, image in enumerate(images):
-                    if logo.mode == 'RGBA':
-                        overlay = Image.new('RGBA', image.size, (0, 0, 0, 0))
-                        overlay.paste(logo, (x, y))
-                        images[i] = Image.alpha_composite(image.convert('RGBA'), overlay)
-                    else:
-                        image.paste(logo, (x, y))
-                        
-                print("Logo 添加成功")
-            else:
-                print(f"Logo 文件不存在: {logo_path}")
-                
+            self.add_logo_to_images(images)
+            print("Logo添加成功")
         except Exception as e:
-            print(f"添加 Logo 失败: {str(e)}")
+            print(f"Logo添加失败: {str(e)}")
         
         print("\n=== 图片生成完成 ===")
-        print(f"总页数: {len(images)}")
         return images
     
     def calculate_content_height(self, content_items, font):
@@ -658,54 +663,30 @@ class ImageGenerator:
         return lines
     
     def render_text(self, draw, text_content, font):
-        """渲染文字到图片上"""
+        """渲染文字到图片"""
         current_y = self.margin
-        max_width = self.width - (self.margin * 2)
         
         print(f"\n=== 开始渲染文本 ===")
         print(f"总内容块数: {len(text_content)}")
-        
-        # 获取第一个内容块的行间距作为统一行间距
-        global_line_spacing = None
-        for item in text_content:
-            if item.get('text', '').strip() and item['type'] == 'content':
-                global_line_spacing = item.get('line_spacing', 45)
-                print(f"使用全局行间距: {global_line_spacing}")
-                break
-        
-        if global_line_spacing is None:
-            global_line_spacing = 45  # 如果没有找到内容块，使用默认值
-            print(f"使用默认行间距: {global_line_spacing}")
-        
-        # 计算当前页面已使用的高度
-        total_height = 0
         
         for item in text_content:
             if not item.get('text', '').strip():
                 print("跳过空内容块")
                 continue
             
+            font_size = item.get('font_size', 48 if item['type'] == 'title' else 32)
+            line_spacing = item.get('line_spacing', 45)
+            alignment = 'center' if item['type'] == 'title' else 'left'
+            
             print(f"\n--- 渲染内容块 ---")
             print(f"类型: {item['type']}")
-            print(f"内容: {item.get('text', '')[:50]}...")
+            print(f"内容: {item['text'][:30]}...")
             print(f"当前Y位置: {current_y}")
-            
-            # 使用内容块自带的字体大小
-            font_size = item.get('font_size')
-            if font_size is None:
-                font_size = 48 if item['type'] == 'title' else 32
-                print(f"使用默认字体大小: {font_size}")
-            else:
-                print(f"使用自定义字体大小: {font_size}")
-            
-            # 使用统一的行间距
-            line_spacing = global_line_spacing
+            print(f"使用字体大小: {font_size}")
             print(f"使用行间距: {line_spacing}")
-            alignment = 'center' if item['type'] == 'title' else 'left'
             print(f"对齐方式: {alignment}")
             
             try:
-                print(f"尝试加载字体: {font.path}, 大小: {font_size}")
                 current_font = ImageFont.truetype(font.path, font_size)
                 print("字体加载成功")
             except Exception as e:
@@ -713,25 +694,16 @@ class ImageGenerator:
                 continue
             
             # 获取换行后的文本
-            lines = self.get_wrapped_text(item['text'], current_font, max_width)
-            print(f"文本分行数: {len(lines)}")
-            
-            # 计算此内容块的总高度
-            block_height = len(lines) * line_spacing
-            total_height += block_height
-            print(f"内容块总高度: {block_height}")
-            print(f"当前总高度: {total_height}")
-            
-            # 检查是否会超出页面底部
-            if total_height > self.height - self.margin * 2:
-                print(f"警告：内容超出页面底部，需要分页")
-                print(f"需要总高度: {total_height}")
-                print(f"最大可用高度: {self.height - self.margin * 2}")
-                return False
+            lines = item['text'].split('\n')
             
             # 渲染每一行
             for line_num, line in enumerate(lines):
-                if not line:
+                # 检查是否超出页面底部
+                if current_y + line_spacing > self.height - self.margin:
+                    print(f"警告：当前行将超出页面底部，需要在新页面继续")
+                    return False  # 返回False表示需要创建新页面
+                
+                if not line.strip():
                     current_y += line_spacing // 2
                     print(f"空行处理，Y位置更新到: {current_y}")
                     continue
@@ -749,25 +721,26 @@ class ImageGenerator:
                     print(f"渲染第 {line_num + 1} 行文本:")
                     print(f"位置: ({x}, {current_y})")
                     print(f"内容: {line}")
-                    print(f"字体大小: {font_size}")
                     draw.text((x, current_y), line, font=current_font, fill='black')
                     current_y += line_spacing
                 except Exception as e:
                     print(f"渲染文本失败: {str(e)}")
             
-            # 在不同文本块之间添加额外的间距（使用统一行间距）
-            if item != text_content[-1]:  # 如果不是最后一个内容块
+            # 在不同文本块之间添加额外的间距
+            if item != text_content[-1]:
+                if current_y + line_spacing // 2 > self.height - self.margin:
+                    print("警告：添加块间距将超出页面底部，需要在新页面继续")
+                    return False
                 current_y += line_spacing // 2
-                total_height += line_spacing // 2
                 print(f"添加额外间距，Y位置更新到: {current_y}")
         
         print("\n=== 渲染完成 ===")
         return True
-
+    
     def draw_styled_text(self, draw, text, marks, x, y, font, char_spacing=0, line_spacing=20):
         """绘制带样式的文本"""
         char_width = font.getlength("测")  # 使用一个汉字宽度作为参考
-        line_height = font.size + line_spacing  # 行高等于字体大小加行间距
+        line_height = font.size + line_spacing / 3  # 行高等于字体大小加行间距
         
         # 计算每行最大宽度（考虑右边距）
         max_width = self.width - (self.margin * 2)
@@ -905,7 +878,7 @@ class ImageGenerator:
         except Exception as e:
             print(f"创建字体失败: {str(e)}")
             print(f"错误类型: {type(e)}")
-            # 如果创建失败，尝试使用��统默认字体
+            # 如果创建失败，尝试使用系统默认字体
             try:
                 print("尝试使用系统默认字体 arial.ttf")
                 return ImageFont.truetype("arial.ttf", size)
@@ -913,3 +886,68 @@ class ImageGenerator:
                 print(f"加载系统默认字体也失败: {str(e2)}")
                 print("使用 PIL 默认字体")
                 return ImageFont.load_default()
+    
+    def add_logo_to_images(self, images):
+        """为所有图片添加Logo"""
+        try:
+            # 获取 logo 路径
+            if hasattr(sys, '_MEIPASS'):
+                logo_path = os.path.join(sys._MEIPASS, 'resources', 'icons', 'logo.png')
+            else:
+                logo_path = os.path.join('resources', 'icons', 'logo.png')
+            
+            print(f"\n=== 添加 Logo ===")
+            print(f"Logo 路径: {logo_path}")
+            print(f"Logo 文件是否存在: {os.path.exists(logo_path)}")
+            
+            if os.path.exists(logo_path):
+                # 加载 logo
+                logo = Image.open(logo_path)
+                print(f"Logo 模式: {logo.mode}")
+                print(f"Logo 尺寸: {logo.size}")
+                
+                # 设置 logo 大小
+                logo_height = 60  # logo 的目标高度
+                aspect_ratio = logo.width / logo.height
+                logo_width = int(logo_height * aspect_ratio)
+                
+                # 调整 logo 大小
+                logo = logo.resize((logo_width, logo_height), Image.Resampling.LANCZOS)
+                print(f"调整后的 Logo 尺寸: {logo.size}")
+                
+                # 计算 logo 位置（左下角，留出边距）
+                margin = 20  # 边距
+                x = margin
+                y = self.height - logo_height - margin
+                print(f"Logo 位置: ({x}, {y})")
+                
+                # 为每个图片添加 logo
+                for i, image in enumerate(images):
+                    if logo.mode == 'RGBA':
+                        print("处理带透明通道的 Logo")
+                        # 将原图转换为 RGBA 模式
+                        image = image.convert('RGBA')
+                        # 创建一个与原图大小相同的透明图层
+                        overlay = Image.new('RGBA', image.size, (0, 0, 0, 0))
+                        # 将 logo 粘贴到透明图层上
+                        overlay.paste(logo, (x, y))
+                        # 将透明图层与原图合并
+                        image = Image.alpha_composite(image, overlay)
+                        # 转换回 RGB 模式
+                        image = image.convert('RGB')
+                    else:
+                        print("处理不带透明通道的 Logo")
+                        # 如果 logo 没有透明通道，直接粘贴
+                        image.paste(logo, (x, y))
+                    
+                    # 更新图片列表
+                    images[i] = image
+                
+                print("Logo 添加成功")
+            else:
+                print(f"Logo 文件不存在: {logo_path}")
+                
+        except Exception as e:
+            print(f"添加 Logo 失败: {str(e)}")
+            import traceback
+            traceback.print_exc()
