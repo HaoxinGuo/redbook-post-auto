@@ -370,7 +370,7 @@ class MainWindow(QMainWindow):
                         print(f"Logo 尺寸: {logo.size}")
                         
                         # 设置 logo 大小
-                        logo_height = 60  # logo 的目标高度
+                        logo_height = 50  # logo 的目标高度
                         aspect_ratio = logo.width / logo.height
                         logo_width = int(logo_height * aspect_ratio)
                         
