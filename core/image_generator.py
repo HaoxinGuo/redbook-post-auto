@@ -386,9 +386,6 @@ class ImageGenerator:
         
         # 获取内容
         text = text_content.get('text', '')
-        print("\n3333333333333333333333333")
-        print(text)
-        print("\n3333333333333333333333333")
         font_size = text_content.get('font_size', 48)
         line_spacing = text_content.get('line_spacing', 20)
         char_spacing = text_content.get('char_spacing', 0)
