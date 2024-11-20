@@ -1,14 +1,9 @@
 {
     "backgrounds": [
         {
-            "name": "新格子背景",
-            "value": "new",
-            "url": "resources/backgrounds/new.png"
-        },
-        {
-            "name": "格子背景",
-            "value": "grid",
-            "url": "resources/backgrounds/grid.png"
+            "name": "浅灰色",
+            "value": "lightgray",
+            "url": "resources/backgrounds/lightgray.png"
         },
         {
             "name": "纯白色背景",
@@ -30,15 +25,21 @@
             "value": "pinkish",
             "url": "resources/backgrounds/pinkish.png"
         },
-        {
-            "name": "浅粉色",
-            "value": "pinkish",
-            "url": "resources/backgrounds/pinkish.png"
-        },
+
         {
             "name": "浅蓝色",
             "value": "lightblue",
             "url": "resources/backgrounds/lightblue.png"
+        },
+        {
+            "name": "新格子背景",
+            "value": "new",
+            "url": "resources/backgrounds/new.png"
+        },
+        {
+            "name": "格子背景",
+            "value": "grid",
+            "url": "resources/backgrounds/grid.png"
         }
     ],
     "fonts": {
