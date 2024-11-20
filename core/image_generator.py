@@ -5,6 +5,7 @@ import re
 import sys
 import logging
 from datetime import datetime
+from core.logo_processor import LogoProcessor
 
 class ImageGenerator:
     def __init__(self):
@@ -12,6 +13,7 @@ class ImageGenerator:
         self.height = 1440  # 3:4 比例
         self.margin = 50  # 边距
         self.list_indent = 30  # 列表缩进
+        self.logo_processor = LogoProcessor(self.width, self.height)
         
         # 设置日志
         self.setup_logger()
@@ -176,13 +178,13 @@ class ImageGenerator:
                     images.append(image)
                     self.logger.info(f"完成第 {len(images)} 页")
                 else:
-                    self.logger.warning("当前页面没有内容可渲染")
+                    self.logger.warning("��前页面没有内容可渲染")
                     if remaining_content:
                         remaining_content.pop(0)
                 
                 # 添加Logo
                 try:
-                    self.add_logo_to_images([image])
+                    self.logo_processor.add_logo(images)
                     self.logger.info("Logo添加成功")
                 except Exception as e:
                     self.logger.error(f"Logo添加失败: {str(e)}")
@@ -886,71 +888,6 @@ class ImageGenerator:
                 print(f"加载系统默认字体也败: {str(e2)}")
                 print("使 PIL 默认字体")
                 return ImageFont.load_default()
-    
-    def add_logo_to_images(self, images):
-        """为所有图片添加Logo"""
-        try:
-            # 获取 logo 路径
-            if hasattr(sys, '_MEIPASS'):
-                logo_path = os.path.join(sys._MEIPASS, 'resources', 'icons', 'logo.png')
-            else:
-                logo_path = os.path.join('resources', 'icons', 'logo.png')
-            
-            print(f"\n=== 添加 Logo ===")
-            print(f"Logo 路径: {logo_path}")
-            print(f"Logo 文件是否存在: {os.path.exists(logo_path)}")
-            
-            if os.path.exists(logo_path):
-                # 加载 logo
-                logo = Image.open(logo_path)
-                print(f"Logo 模式: {logo.mode}")
-                print(f"Logo 寸: {logo.size}")
-                
-                # 设置 logo 大小
-                logo_height = 60  # logo 的目标高���
-                aspect_ratio = logo.width / logo.height
-                logo_width = int(logo_height * aspect_ratio)
-                
-                # 调整 logo 大小
-                logo = logo.resize((logo_width, logo_height), Image.Resampling.LANCZOS)
-                print(f"调整后的 Logo 尺寸: {logo.size}")
-                
-                # 计算 logo 位置（左下角，留出边距）
-                margin = 20  # 边距
-                x = margin
-                y = self.height - logo_height - margin
-                print(f"Logo 位置: ({x}, {y})")
-                
-                # 为每个图片添加 logo
-                for i, image in enumerate(images):
-                    if logo.mode == 'RGBA':
-                        print("处理带透明通道的 Logo")
-                        # 将原图转换为 RGBA 模式
-                        image = image.convert('RGBA')
-                        # 创建一个与原图大小相同的透明图层
-                        overlay = Image.new('RGBA', image.size, (0, 0, 0, 0))
-                        # 将 logo 粘贴到透明图层上
-                        overlay.paste(logo, (x, y))
-                        # 将透明图层与原图合并
-                        image = Image.alpha_composite(image, overlay)
-                        # 转换回 RGB 模式
-                        image = image.convert('RGB')
-                    else:
-                        print("处理不带透明通道的 Logo")
-                        # 如果 logo 没有透明通道，直接粘贴
-                        image.paste(logo, (x, y))
-                    
-                    # 更新图片列表
-                    images[i] = image
-                
-                print("Logo 添加成功")
-            else:
-                print(f"Logo 文件不存在: {logo_path}")
-                
-        except Exception as e:
-            print(f"添加 Logo 失败: {str(e)}")
-            import traceback
-            traceback.print_exc()
     
     def calculate_block_height(self, wrapped_lines, item):
         """计算内容块的总高度，包括行间距和空白行"""
