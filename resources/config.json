@@ -1,6 +1,11 @@
 {
     "backgrounds": [
         {
+            "name": "新背景",
+            "value": "new",
+            "url": "resources/backgrounds/new.png"
+        },
+        {
             "name": "格子背景",
             "value": "grid",
             "url": "resources/backgrounds/grid.png"
@@ -9,11 +14,6 @@
             "name": "小红书背景",
             "value": "memo",
             "url": "resources/backgrounds/memo.png"
-        },
-        {
-            "name": "新背景",
-            "value": "new",
-            "url": "resources/backgrounds/new.png"
         },
         {
             "name": "纯灰色",
