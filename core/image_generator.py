@@ -65,136 +65,112 @@ class ImageGenerator:
             return {}
         
     def create_images(self, text_content, background_path, font_style='normal'):
-        """生成多页图片，优化空白行处理"""
-        images = []
-        remaining_content = text_content.copy()
-        
-        self.logger.info("\n=== 开始生成图片 ===")
-        self.logger.info(f"总内容块数: {len(text_content)}")
-        self.logger.info("字体样式: %s", font_style)
-        self.logger.info("背景路径: %s", background_path)
-        
-        while remaining_content:
-            # 创建新页面
-            image = Image.new('RGB', (self.width, self.height), 'white')
-            if background_path:
-                try:
-                    bg = Image.open(background_path)
-                    bg = bg.resize((self.width, self.height))
-                    image.paste(bg, (0, 0))
-                    self.logger.debug("背景加载成功")
-                except Exception as e:
-                    self.logger.error(f"背景加载失败: {str(e)}")
+        """生成多页图片"""
+        try:
+            images = []
+            remaining_content = text_content.copy()
             
-            draw = ImageDraw.Draw(image)
-            current_page_content = []
-            current_y = self.margin
-            
-            self.logger.info("\n处理新页面:")
             while remaining_content:
-                # 获取下一个内容块
-                item = remaining_content[0]
-                if not item.get('text', '').strip():
-                    remaining_content.pop(0)
-                    continue
+                # 创建新页面
+                image = Image.new('RGB', (self.width, self.height), 'white')
+                if background_path:
+                    try:
+                        bg = Image.open(background_path)
+                        bg = bg.resize((self.width, self.height))
+                        image.paste(bg, (0, 0))
+                        self.logger.debug("背景加载成功")
+                    except Exception as e:
+                        self.logger.error(f"背景加载失败: {str(e)}")
                 
-                self.logger.debug(f"\n处理内容块:")
-                self.logger.debug(f"类型: {item['type']}")
-                self.logger.debug(f"原始文本:\n{item['text']}")
+                draw = ImageDraw.Draw(image)
+                current_page_content = []
+                current_y = self.margin
                 
-                # 设置字体
-                font_size = item.get('font_size', 48 if item['type'] == 'title' else 32)
-                line_spacing = item.get('line_spacing', 45)
-                
-                try:
-                    current_font = ImageFont.truetype(self.fonts[font_style].path, font_size)
-                    self.logger.debug(f"字体加载成功: size={font_size}")
-                except Exception as e:
-                    self.logger.error(f"字体加载失败: {str(e)}")
-                    remaining_content.pop(0)
-                    continue
-                
-                # 计算可用高度
-                available_height = self.height - current_y - self.margin
-                self.logger.debug(f"可用高度: {available_height}")
-                
-                # 获取文本的实际换行
-                text = item['text']
-                max_width = self.width - (self.margin * 2)
-                
-                self.logger.debug("\n开始文本换行处理:")
-                wrapped_lines = self.get_wrapped_text(text, current_font, max_width)
-                
-                # 计算这些行实际需要的高度
-                total_height = 0
-                used_lines = []
-                
-                for line in wrapped_lines:
-                    # 计算当前行需要的高度
-                    if line == '\n':
-                        line_height = line_spacing // 2
-                    else:
-                        line_height = line_spacing
+                # 处理当前页面的内容
+                while remaining_content:
+                    item = remaining_content[0]
+                    font_size = item.get('font_size', 48 if item['type'] == 'title' else 32)
                     
-                    # 检查是否还有足够空间
-                    if total_height + line_height <= available_height:
-                        used_lines.append(line)
-                        total_height += line_height
-                    else:
-                        # 如果这是块的第一行且放不下，直接创建新页面
-                        if not used_lines:
-                            break
-                        # 否则保存已处理的行，剩余的留到下一页
-                        break
-                
-                self.logger.debug(f"\n当前页面可容纳行数: {len(used_lines)}")
-                
-                # 如果当前页面能放下一些内容
-                if used_lines:
-                    # 创建新的内容块，保持原始的换行格式
-                    partial_content = {
-                        'type': item['type'],
-                        'text': '\n'.join(used_lines) if used_lines else '',
-                        'line_spacing': line_spacing,
-                        'font_size': font_size
-                    }
-                    current_page_content.append(partial_content)
-                    
-                    # 更新剩余内容
-                    unused_lines = wrapped_lines[len(used_lines):]
-                    if unused_lines:
-                        remaining_content[0] = {
-                            'type': item['type'],
-                            'text': '\n'.join(unused_lines),
-                            'line_spacing': line_spacing,
-                            'font_size': font_size
-                        }
-                    else:
+                    try:
+                        current_font = ImageFont.truetype(self.fonts[font_style].path, font_size)
+                    except Exception as e:
+                        self.logger.error(f"字体加载失败: {str(e)}")
                         remaining_content.pop(0)
+                        continue
                     
-                    current_y += total_height
-                    self.logger.debug(f"更新当前Y坐标: {current_y}")
+                    # 如果内容已经预处理过，直接使用
+                    if 'wrapped_lines' in item:
+                        wrapped_lines = item['wrapped_lines']
+                    else:
+                        # 预处理文本换行
+                        max_width = self.width - (self.margin * 2)
+                        wrapped_lines = self.get_wrapped_text(item['text'], current_font, max_width)
+                    
+                    # 计算此内容块的高度
+                    block_height = self.calculate_block_height(wrapped_lines, item)
+                    
+                    # 检查是否需要新页面
+                    if current_y + block_height > self.height - self.margin:
+                        if not current_page_content:
+                            # 如果是第一个内容块且太大，需要强制分割
+                            self.logger.warning(f"内容块太大，需要分割: {block_height} > {self.height - current_y - self.margin}")
+                            
+                            # 计算当前页面可以容纳的行数
+                            available_height = self.height - current_y - self.margin
+                            line_spacing = item.get('line_spacing', 45)
+                            max_lines = int(available_height / line_spacing)
+                            
+                            if max_lines > 0:
+                                # 分割内容
+                                current_lines = wrapped_lines[:max_lines]
+                                remaining_lines = wrapped_lines[max_lines:]
+                                
+                                # 创建分割后的内容块
+                                current_item = dict(item)
+                                current_item['wrapped_lines'] = current_lines
+                                
+                                remaining_item = dict(item)
+                                remaining_item['wrapped_lines'] = remaining_lines
+                                
+                                current_page_content.append(current_item)
+                                remaining_content[0] = remaining_item
+                                self.logger.debug(f"内容块分割完成: 当前页 {len(current_lines)} 行，剩余 {len(remaining_lines)} 行")
+                            else:
+                                self.logger.error("页面空间不足，跳过当前内容块")
+                                remaining_content.pop(0)
+                        break
+                    
+                    # 将预处理后的内容添加到当前页面
+                    processed_item = dict(item)
+                    processed_item['wrapped_lines'] = wrapped_lines
+                    current_page_content.append(processed_item)
+                    current_y += block_height
+                    
+                    # 从剩余内容中移除已处理的项
+                    remaining_content.pop(0)
+                
+                # 渲染当前页面的内容
+                if current_page_content:
+                    self.render_text(draw, current_page_content, self.fonts[font_style])
+                    images.append(image)
+                    self.logger.info(f"完成第 {len(images)} 页")
                 else:
-                    # 如果一行都放不下，创建新页面
-                    self.logger.debug("当前页面空间不足，准备创建新页面")
-                    break
+                    self.logger.warning("当前页面没有内容可渲染")
+                    if remaining_content:
+                        remaining_content.pop(0)
+                
+                # 添加Logo
+                try:
+                    self.add_logo_to_images([image])
+                    self.logger.info("Logo添加成功")
+                except Exception as e:
+                    self.logger.error(f"Logo添加失败: {str(e)}")
             
-            # 渲染当前页面的内容
-            if current_page_content:
-                self.logger.info(f"\n渲染当前页面，内容块数: {len(current_page_content)}")
-                self.render_text(draw, current_page_content, self.fonts[font_style])
-                images.append(image)
-                self.logger.info(f"完成第 {len(images)} 页")
+            return images
             
-            # 添加Logo
-            try:
-                self.add_logo_to_images(images)
-                self.logger.info("Logo添加成功")
-            except Exception as e:
-                self.logger.error(f"Logo添加失败: {str(e)}")
-        
-        self.logger.info(f"\n=== 图片生成完成，共 {len(images)} 页 ===\n")
-        return images
+        except Exception as e:
+            self.logger.error(f"生成图片错误: {str(e)}")
+            raise
     
     def calculate_content_height(self, content_items, font):
         """计算内容块的总高度"""
@@ -401,7 +377,7 @@ class ImageGenerator:
                 y = self.height - logo_height - margin
                 print(f"Logo 位置: ({x}, {y})")
                 
-                # ���果 logo 有透明通道，需要特殊处理
+                # 果 logo 有透明通道，需要特殊处理
                 if logo.mode == 'RGBA':
                     print("处理带透明通道的 Logo")
                     # 将原图转换为 RGBA 模式
@@ -596,9 +572,9 @@ class ImageGenerator:
             
             for paragraph in paragraphs:
                 # 检查段落是否是新的列表项
-                sub_list_match = re.match(r'^(\s*)((?:\d+[.、)]|[a-z][.、)]|[-•*])\s+)(.+)$', paragraph)
+                sub_list_match = re.match(r'^(\s*)((?:\d+[.、)]|[a-z][.、)]|[-���*])\s+)(.+)$', paragraph)
                 if sub_list_match and not first_line:
-                    # 如果是新的列表项，递归处理
+                    # 果是新的列表项，递归处理
                     sub_lines = self.get_wrapped_text(paragraph, font, max_width)
                     lines.extend(sub_lines)
                     continue
@@ -685,66 +661,45 @@ class ImageGenerator:
     def render_text(self, draw, text_content, font):
         """渲染文字到图片"""
         current_y = self.margin
-        last_item_type = None  # 记录上一个内容块的类型
+        last_item_type = None
         
         for item in text_content:
-            # 修改这里：不跳过只包含空格的内容
-            if not item.get('text'):  # 只跳过完全为空的内容
+            if not item.get('text'):
                 continue
             
+            # 使用预处理的换行结果
+            lines = item['wrapped_lines']
             font_size = item.get('font_size', 48 if item['type'] == 'title' else 32)
             line_spacing = item.get('line_spacing', 45)
-            alignment = 'center' if item['type'] == 'title' else 'left'
-            
-            # 如果当前是内容块且上一个内容块是标题，添加半个行间距
-            if last_item_type == 'title' and item['type'] != 'title':
-                current_y += line_spacing // 1.5
             
             try:
                 current_font = ImageFont.truetype(font.path, font_size)
             except Exception as e:
-                print(f"字体加载失败: {str(e)}")
+                self.logger.error(f"字体加载失败: {str(e)}")
                 continue
             
-            # 每次渲染时重新计算换行
-            max_width = self.width - (self.margin * 2)
-            text = item['text']
-            lines = self.get_wrapped_text(text, current_font, max_width)
+            # 处理标题和内容块之间的间距
+            if last_item_type == 'title' and item['type'] == 'content':
+                current_y += line_spacing // 2
             
+            # 渲染每一行
             for line in lines:
-                if current_y + line_spacing > self.height - self.margin:
-                    return False
-                
-                # 处理硬换行
-                if line == '\n':
-                    current_y += line_spacing // 2  # 硬换行添加半个行间距
+                if not line.strip():  # 空白行
+                    current_y += line_spacing // 2
                     continue
                 
-                # 计算每行的实际宽度（包括前导空格）
-                text_width = 0
-                x = self.margin  # 起始 x 坐标
-                
-                if alignment == 'center':
-                    # 对于居中对齐，先计算整行宽度
+                # 计算行的位置
+                if item['type'] == 'title':
                     text_width = sum(current_font.getlength(char) for char in line)
                     x = (self.width - text_width) // 2
+                else:
+                    x = self.margin
                 
-                try:
-                    # 逐字符渲染，包括空格
-                    current_x = x
-                    for char in line:
-                        char_width = current_font.getlength(char)
-                        draw.text((current_x, current_y), char, font=current_font, fill='black')
-                        current_x += char_width
-                    
-                    current_y += line_spacing
-                except Exception as e:
-                    print(f"渲染文字失败: {str(e)}")
+                # 渲染文本
+                draw.text((x, current_y), line, font=current_font, fill='black')
+                current_y += line_spacing
             
-            # 更新上一个内容块的类型
             last_item_type = item['type']
-        
-        return True
     
     def draw_styled_text(self, draw, text, marks, x, y, font, char_spacing=0, line_spacing=20):
         """绘制带样式的文本"""
@@ -928,7 +883,7 @@ class ImageGenerator:
                 # 加载 logo
                 logo = Image.open(logo_path)
                 print(f"Logo 模式: {logo.mode}")
-                print(f"Logo 尺寸: {logo.size}")
+                print(f"Logo 寸: {logo.size}")
                 
                 # 设置 logo 大小
                 logo_height = 60  # logo 的目标高度
@@ -975,3 +930,26 @@ class ImageGenerator:
             print(f"添加 Logo 失败: {str(e)}")
             import traceback
             traceback.print_exc()
+    
+    def calculate_block_height(self, wrapped_lines, item):
+        """计算内容块的总高度，包括行间距和空白行"""
+        if not wrapped_lines:
+            return 0
+        
+        total_height = 0
+        line_spacing = item.get('line_spacing', 45)
+        
+        for i, line in enumerate(wrapped_lines):
+            if not line.strip():  # 空白行
+                # 空白行使用半个行间距
+                total_height += line_spacing // 2
+            else:
+                # 正常行使用完整行间距
+                total_height += line_spacing
+            
+            # 如果是标题块且有下一个内容块，添加额外的间距
+            if item['type'] == 'title' and i == len(wrapped_lines) - 1:
+                total_height += line_spacing // 2
+        
+        self.logger.debug(f"内容块高度计算: {len(wrapped_lines)} 行, 总高度 {total_height}")
+        return total_height
