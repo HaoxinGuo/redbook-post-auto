@@ -115,10 +115,27 @@ class ImageGenerator:
                             # 如果是第一个内容块且太大，需要强制分割
                             self.logger.warning(f"内容块太大，需要分割: {block_height} > {self.height - current_y - self.margin}")
                             
-                            # 计算当前页面可以容纳的行数
+                            # 修改这里：计算实际可用空间和每行实际高度
                             available_height = self.height - current_y - self.margin
                             line_spacing = item.get('line_spacing', 45)
-                            max_lines = int(available_height / line_spacing)
+                            
+                            # 计算每种类型行的实际高度
+                            normal_line_height = line_spacing
+                            empty_line_height = line_spacing // 2
+                            
+                            # 计算可以放入的行数
+                            remaining_height = available_height
+                            max_lines = 0
+                            
+                            for line in wrapped_lines:
+                                line_height = empty_line_height if not line.strip() else normal_line_height
+                                if remaining_height >= line_height:
+                                    max_lines += 1
+                                    remaining_height -= line_height
+                                else:
+                                    break
+                            
+                            self.logger.debug(f"可用高度: {available_height}, 计算得到可容纳行数: {max_lines}")
                             
                             if max_lines > 0:
                                 # 分割内容
@@ -131,6 +148,10 @@ class ImageGenerator:
                                 
                                 remaining_item = dict(item)
                                 remaining_item['wrapped_lines'] = remaining_lines
+                                
+                                # 计算实际高度以验证
+                                current_height = self.calculate_block_height(current_lines, current_item)
+                                self.logger.debug(f"分割后当前块实际高度: {current_height}")
                                 
                                 current_page_content.append(current_item)
                                 remaining_content[0] = remaining_item
@@ -572,7 +593,7 @@ class ImageGenerator:
             
             for paragraph in paragraphs:
                 # 检查段落是否是新的列表项
-                sub_list_match = re.match(r'^(\s*)((?:\d+[.、)]|[a-z][.、)]|[-���*])\s+)(.+)$', paragraph)
+                sub_list_match = re.match(r'^(\s*)((?:\d+[.、)]|[a-z][.、)]|[-•*])\s+)(.+)$', paragraph)
                 if sub_list_match and not first_line:
                     # 果是新的列表项，递归处理
                     sub_lines = self.get_wrapped_text(paragraph, font, max_width)
@@ -886,7 +907,7 @@ class ImageGenerator:
                 print(f"Logo 寸: {logo.size}")
                 
                 # 设置 logo 大小
-                logo_height = 60  # logo 的目标高度
+                logo_height = 60  # logo 的目标高���
                 aspect_ratio = logo.width / logo.height
                 logo_width = int(logo_height * aspect_ratio)
                 
