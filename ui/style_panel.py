@@ -78,20 +78,20 @@ class StylePanel(QWidget):
         font_layout.addLayout(font_buttons)
         
         # 文字颜色
-        color_group = QWidget()
-        color_layout = QVBoxLayout(color_group)
+        #color_group = QWidget()
+        #color_layout = QVBoxLayout(color_group)
         
         text_color_label = QLabel("文字颜色：")
         self.text_color_button = QPushButton("选择颜色")
         self.text_color_button.clicked.connect(self.choose_text_color)
         
-        color_layout.addWidget(text_color_label)
-        color_layout.addWidget(self.text_color_button)
+        #color_layout.addWidget(text_color_label)
+        #color_layout.addWidget(self.text_color_button)
         
         # 添加所有组件到主布局
         layout.addWidget(bg_group)
         layout.addWidget(font_group)
-        layout.addWidget(color_group)
+        #layout.addWidget(color_group)
         layout.addStretch()
         
         # 连接信号
@@ -112,7 +112,7 @@ class StylePanel(QWidget):
         return {
             'background': self.bg_combo.currentData(),
             'font_style': 'handwritten' if self.handwritten_font.isChecked() else 'normal',
-            'text_color': self.text_color_button.palette().button().color().name()
+            #'text_color': self.text_color_button.palette().button().color().name()
         }
 
     def emit_style_change(self):
@@ -133,7 +133,7 @@ class StylePanel(QWidget):
             self.normal_font.setChecked(True)
             
         # 设置文字颜色
-        if 'text_color' in style_dict:
-            self.text_color_button.setStyleSheet(
-                f"background-color: {style_dict['text_color']}"
-            )
+        #if 'text_color' in style_dict:
+        #    self.text_color_button.setStyleSheet(
+        #        f"background-color: {style_dict['text_color']}"
+        #    )
