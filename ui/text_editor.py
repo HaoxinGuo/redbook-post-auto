@@ -54,7 +54,7 @@ class TextBlock(QWidget):
 
         # 删除按钮
         delete_button = QPushButton("X")
-        delete_button.setFixedSize(40, 20)  # 设置固定大小
+        delete_button.setFixedSize(20, 20)  # 设置固定大小
         delete_button.clicked.connect(lambda: self.deleted.emit(self))
         delete_button.setStyleSheet("""
             QPushButton {
@@ -83,8 +83,8 @@ class TextBlock(QWidget):
     def on_type_changed(self, text):
         """根据类型调整编辑框高度"""
         if text == "标题":
-            self.editor.setMinimumHeight(40)  # 减小标题最小高度
-            self.editor.setMaximumHeight(40)  # 减小标题最大高度
+            self.editor.setMinimumHeight(50)  # 减小标题最小高度
+            self.editor.setMaximumHeight(50)  # 减小标题最大高度
             # 设置标题的字体大小
             self.editor.setStyleSheet("""
                 QTextEdit {
@@ -93,7 +93,7 @@ class TextBlock(QWidget):
                     border: 1px solid #D9D9D9;
                     border-radius: 4px;
                     background-color: white;
-                    font-size: 36px;
+                    font-size: 12px;
                     font-weight: bold;
                 }
                 QTextEdit:focus {
@@ -166,12 +166,19 @@ class TextEditor(QWidget):
         super().__init__(parent)
         self.text_blocks = []
         self.init_ui()
-        # 添加一个默认的内容文本块
+        # 添加一个默认的标题文本块
         first_block = TextBlock()
         first_block.deleted.connect(self.remove_text_block)
-        first_block.type_combo.setCurrentText("内容")  # 设置第一个文本块为标题类型
+        first_block.type_combo.setCurrentText("标题")  # 设置第一个文本块为标题类型
         self.text_blocks.append(first_block)
         self.blocks_layout.addWidget(first_block)
+
+        # 添加一个默认的内容文本块
+        second_block = TextBlock()
+        second_block.deleted.connect(self.remove_text_block)
+        second_block.type_combo.setCurrentText("内容")  # 设置第二个文本块为内容类型
+        self.text_blocks.append(second_block)
+        self.blocks_layout.addWidget(second_block)
 
     def init_ui(self):
         layout = QVBoxLayout(self)
