@@ -8,19 +8,32 @@ from datetime import datetime
 from core.logo_processor import LogoProcessor
 
 class ImageGenerator:
+    """
+    图片生成器类
+    负责将文本内容转换为图片，支持标题、正文、列表等多种格式的渲染
+    """
     def __init__(self):
-        self.width = 1080
-        self.height = 1440  # 3:4 比例
-        self.margin = 50  # 边距
-        self.list_indent = 30  # 列表缩进
+        """
+        初始化图片生成器
+        设置基本参数、初始化日志系统和字体加载
+        """
+        self.width = 1080        # 图片宽度
+        self.height = 1440       # 图片高度 (3:4 比例)
+        self.margin = 50         # 页面边距
+        self.list_indent = 30    # 列表缩进
         self.logo_processor = LogoProcessor(self.width, self.height)
         
-        # 设置日志
+        # 设置日志和加载字体
         self.setup_logger()
         self.fonts = self.load_fonts()
         
     def setup_logger(self):
-        """配置日志"""
+        """
+        配置日志系统
+        - 创建logs目录存储日志文件
+        - 设置日志格式和输出方式
+        - 同时输出到文件和控制台
+        """
         # 创建logs目录
         if not os.path.exists('logs'):
             os.makedirs('logs')
@@ -43,7 +56,18 @@ class ImageGenerator:
         self.logger.info('ImageGenerator initialized')
         
     def load_fonts(self):
-        """加载字体"""
+        """
+        加载字体文件
+        - 支持打包后和开发环境的字体路径
+        - 加载默认字体文件 MSYH.TTF
+        
+        返回:
+            dict: 包含加载好的字体对象的字典
+        
+        异常:
+            - 记录字体加载失败的错误
+            - 返回空字典作为降级处理
+        """
         fonts = {}
         try:
             # 获取资源路径
@@ -67,7 +91,24 @@ class ImageGenerator:
             return {}
         
     def create_images(self, text_content, background_path, font_style='normal'):
-        """生成多页图片"""
+        """
+        生成图片的主要方法
+        
+        参数:
+            text_content (list): 要渲染的文本内容列表，每项包含类型和文本
+            background_path (str): 背景图片的路径
+            font_style (str): 字体样式，默认为'normal'
+        
+        返回:
+            list: 生成的图片列表
+            
+        功能:
+            - 支持多页面生成
+            - 自动处理内容分页
+            - 保持标题和内容的布局完整性
+            - 添加背景和Logo
+            - 处理内容溢出和分割
+        """
         try:
             images = []
             remaining_content = text_content.copy()
@@ -178,7 +219,7 @@ class ImageGenerator:
                     images.append(image)
                     self.logger.info(f"完成第 {len(images)} 页")
                 else:
-                    self.logger.warning("��前页面没有内容可渲染")
+                    self.logger.warning("前页面没有内容可渲染")
                     if remaining_content:
                         remaining_content.pop(0)
                 
@@ -545,7 +586,23 @@ class ImageGenerator:
         return '\n'.join(processed_lines)
     
     def get_wrapped_text(self, text, font, max_width):
-        """将文本按照最大宽度换行，支持列表格式和前导空格"""
+        """
+        处理文本自动换行
+        
+        参数:
+            text (str): 原始文本
+            font: 字体对象
+            max_width (int): 最大行宽
+            
+        返回:
+            list: 换行后的文本行列表
+            
+        功能:
+            - 按照最大宽度自动换行
+            - 保持原有的手动换行
+            - 处理空行和段落间距
+            - 确保文本不会超出边界
+        """
         def get_next_break_point(text, start_idx, current_width, max_width):
             """找下一个合适的换行点"""
             width = current_width
@@ -682,7 +739,20 @@ class ImageGenerator:
         return lines
     
     def render_text(self, draw, text_content, font):
-        """渲染文字到图片"""
+        """
+        渲染文本到图片
+        
+        参数:
+            draw: PIL的ImageDraw对象
+            text_content (list): 预处理后的文本内容列表
+            font: 字体对象
+            
+        功能:
+            - 处理标题和内容的不同渲染样式
+            - 支持文本居中和左对齐
+            - 处理行间距和段落间距
+            - 保持标题和内容的间距一致性
+        """
         current_y = self.margin
         last_item_type = None
         
@@ -850,7 +920,22 @@ class ImageGenerator:
                 )
     
     def create_font(self, size, is_bold=False):
-        """创建体对象，支持不同字重的字体"""
+        """
+        创建字体对象
+        
+        参数:
+            size (int): 字体大小
+            is_bold (bool): 是否使用粗体，默认False
+            
+        返回:
+            PIL.ImageFont: 字体对象
+            
+        功能:
+            - 支持普通和粗体字体
+            - 自动降级到系统字体
+            - 处理字体加载失败的情况
+            - 提供详细的日志信息
+        """
         try:
             # 根据是否加粗选择不同的字体文件
             if is_bold:
@@ -890,7 +975,22 @@ class ImageGenerator:
                 return ImageFont.load_default()
     
     def calculate_block_height(self, wrapped_lines, item):
-        """计算内容块的总高度，包括行间距和空白行"""
+        """
+        计算内容块的总高度
+        
+        参数:
+            wrapped_lines (list): 换行后的文本行列表
+            item (dict): 内容块信息，包含类型和间距设置
+            
+        返回:
+            int: 内容块的总高度（像素）
+            
+        功能:
+            - 计算普通行和空白行的高度
+            - 处理标题和内容的间距
+            - 考虑行间距的设置
+            - 记录调试信息
+        """
         if not wrapped_lines:
             return 0
         
