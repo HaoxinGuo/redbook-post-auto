@@ -79,7 +79,7 @@ class ImageGenerator:
             fonts_dir = os.path.join(base_path, 'resources', 'fonts')
             font_path = os.path.join(fonts_dir, 'MSYH.TTF')
             # 加载手写字体（例如：SourceHanSerif-Regular.otf）
-            handwritten_font_path = os.path.join(fonts_dir, 'bailutongtongshouxieti.ttf')
+            handwritten_font_path = os.path.join(fonts_dir, 'ZhanKuKuaiLeTi2016XiuDingBan-1.ttf')
             
             if not os.path.exists(font_path):
                 self.logger.error(f"Font file not found at: {font_path}")
