@@ -28,32 +28,45 @@ class ImageGenerator:
         self.fonts = self.load_fonts()
         
     def setup_logger(self):
-        """
-        配置日志系统
-        - 创建logs目录存储日志文件
-        - 设置日志格式和输出方式
-        - 同时输出到文件和控制台
-        """
-        # 创建logs目录
-        if not os.path.exists('logs'):
-            os.makedirs('logs')
+        """设置日志记录器"""
+        try:
+            # 根据操作系统类型设置日志目录
+            if sys.platform == 'darwin':  # macOS
+                log_dir = os.path.expanduser('~/Library/Logs/小红书文字转图片工具')
+            elif sys.platform == 'win32':  # Windows
+                log_dir = os.path.join(os.getenv('APPDATA'), '小红书文字转图片工具', 'logs')
+            else:  # Linux 或其他系统
+                log_dir = os.path.expanduser('~/.小红书文字转图片工具/logs')
             
-        # 生成日志文件名，包含时间戳
-        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-        log_file = os.path.join('logs', f'image_generator_{timestamp}.log')
-        
-        # 配置日志格式
-        logging.basicConfig(
-            level=logging.DEBUG,
-            format='%(asctime)s - %(levelname)s - %(message)s',
-            handlers=[
-                logging.FileHandler(log_file, encoding='utf-8'),
-                logging.StreamHandler(sys.stdout)
-            ]
-        )
-        
-        self.logger = logging.getLogger('ImageGenerator')
-        self.logger.info('ImageGenerator initialized')
+            # 确保日志目录存在
+            os.makedirs(log_dir, exist_ok=True)
+            
+            # 设置日志文件路径
+            log_file = os.path.join(log_dir, 'app.log')
+            
+            # 配置日志记录
+            logging.basicConfig(
+                level=logging.DEBUG,
+                format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+                handlers=[
+                    logging.FileHandler(log_file, encoding='utf-8'),
+                    logging.StreamHandler()  # 同时输出到控制台
+                ]
+            )
+            
+            self.logger = logging.getLogger('ImageGenerator')
+            self.logger.info(f'Logger initialized. Log file: {log_file}')
+            
+        except Exception as e:
+            print(f"Error setting up logger: {str(e)}")
+            # 如果无法设置文件日志，至少设置控制台日志
+            logging.basicConfig(
+                level=logging.DEBUG,
+                format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+                handlers=[logging.StreamHandler()]
+            )
+            self.logger = logging.getLogger('ImageGenerator')
+            self.logger.error(f'Failed to setup file logger: {str(e)}')
         
     def load_fonts(self):
         """
