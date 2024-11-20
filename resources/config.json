@@ -6,6 +6,11 @@
             "url": "resources/backgrounds/lightgray.png"
         },
         {
+            "name": "纯白色不带格子背景",
+            "value": "purewhite",
+            "url": "resources/backgrounds/Purewhite.png"
+        },
+        {
             "name": "纯白色背景",
             "value": "white",
             "url": "resources/backgrounds/white.png"
