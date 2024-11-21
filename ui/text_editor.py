@@ -146,32 +146,83 @@ class TextBlock(QWidget):
         doc = self.editor.document()
         text = ""
         colors = []
+        current_position = 0
+        
+        print("\n=== 获取文本内容和颜色信息 ===")
+        print(f"文本块类型: {self.type_combo.currentText()}")
         
         for block_num in range(doc.blockCount()):
             block = doc.findBlockByNumber(block_num)
-            fragment = block.begin()
             
-            while fragment != block.end():
-                fragment_format = fragment.charFormat()
-                color = fragment_format.foreground().color()
-                
-                if color.isValid():
-                    colors.append({
-                        'start': len(text),
-                        'end': len(text) + fragment.length(),
+            print(f"\n处理文本块 {block_num + 1}:")
+            print(f"块文本: '{block.text()}'")
+            
+            # 直接遍历文本块中的字符格式
+            cursor = self.editor.textCursor()
+            cursor.setPosition(block.position())
+            cursor.movePosition(cursor.MoveOperation.EndOfBlock, cursor.MoveMode.KeepAnchor)
+            
+            # 获取选中文本的格式
+            block_format = cursor.charFormat()
+            if block_format.foreground().style() != 0:  # 检查是否设置了前景色
+                color = block_format.foreground().color()
+                if color.isValid() and color.name() != '#000000':
+                    color_info = {
+                        'start': current_position,
+                        'end': current_position + len(block.text()),
                         'color': color.name()
-                    })
-                    
-                text += fragment.text()
-                fragment = fragment.next()
+                    }
+                    colors.append(color_info)
+                    print(f"发现块级颜色: {color.name()}")
+                    print(f"颜色范围: {color_info['start']}-{color_info['end']}")
+            
+            # 逐字符检查颜色
+            for i in range(len(block.text())):
+                cursor.setPosition(block.position() + i)
+                cursor.movePosition(cursor.MoveOperation.Right, cursor.MoveMode.KeepAnchor)
+                char_format = cursor.charFormat()
                 
+                if char_format.foreground().style() != 0:  # 检查是否设置了前景色
+                    color = char_format.foreground().color()
+                    if color.isValid() and color.name() != '#000000':
+                        # 尝试合并连续的相同颜色
+                        if colors and colors[-1]['color'] == color.name() and colors[-1]['end'] == current_position + i:
+                            colors[-1]['end'] = current_position + i + 1
+                        else:
+                            color_info = {
+                                'start': current_position + i,
+                                'end': current_position + i + 1,
+                                'color': color.name()
+                            }
+                            colors.append(color_info)
+                            print(f"发现字符颜色: {color.name()} at position {current_position + i}")
+            
+            # 更新位置计数器
             if block_num < doc.blockCount() - 1:
-                text += '\n'
+                text += block.text() + '\n'
+                current_position += len(block.text()) + 1
+                print("添加换行符，位置更新")
+            else:
+                text += block.text()
+                current_position += len(block.text())
+        
+        # 合并连续的相同颜色区域
+        merged_colors = []
+        for color_info in colors:
+            if merged_colors and merged_colors[-1]['color'] == color_info['color'] and merged_colors[-1]['end'] == color_info['start']:
+                merged_colors[-1]['end'] = color_info['end']
+            else:
+                merged_colors.append(color_info)
+        
+        print(f"\n最终文本: '{text}'")
+        print(f"颜色信息: {merged_colors}")
+        print("=== 内容获取完成 ===\n")
         
         return {
             'type': 'title' if self.type_combo.currentText() == "标题" else 'content',
             'text': text,
-            'colors': colors
+            'colors': merged_colors,
+            'line_spacing': 45
         }
 
     def set_content(self, content):
@@ -198,13 +249,25 @@ class TextBlock(QWidget):
         
         cursor = self.editor.textCursor()
         if not cursor.hasSelection():
+            print("没有选中文本，无法设置颜色")
             return
+        
+        # 获取选中的文本范围
+        start = cursor.selectionStart()
+        end = cursor.selectionEnd()
+        print(f"\n=== 设置文本颜色 ===")
+        print(f"选中文本范围: {start}-{end}")
+        print(f"选中文本内容: '{cursor.selectedText()}'")
         
         color = QColorDialog.getColor()
         if color.isValid():
+            print(f"选择的颜色: {color.name()}")
             fmt = QTextCharFormat()
             fmt.setForeground(color)
             cursor.mergeCharFormat(fmt)
+            print("颜色设置成功")
+        else:
+            print("取消颜色选择")
 
 class TextEditor(QWidget):
     content_changed = pyqtSignal()  # 内容变化信号
@@ -334,101 +397,33 @@ class TextEditor(QWidget):
             self.content_changed.emit()
 
     def get_all_content(self):
-        """获取所有内容，包括行间距和字体大小设置"""
+        """获取所有内容，包括颜色信息"""
         content = []
-        
-        # 设置日志
-        logger = logging.getLogger('TextEditor')
-        logger.setLevel(logging.DEBUG)
-        
-        # 检查是否已经有处理器
-        if not logger.handlers:
-            # 创建logs目录
-            if not os.path.exists('logs'):
-                os.makedirs('logs')
-            
-            # 生成日志文件名，包含时间戳
-            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-            log_file = os.path.join('logs', f'text_editor_{timestamp}.log')
-            
-            # 添加文件处理器
-            file_handler = logging.FileHandler(log_file, encoding='utf-8')
-            file_handler.setLevel(logging.DEBUG)
-            
-            # 添加控制台处理器
-            console_handler = logging.StreamHandler(sys.stdout)
-            console_handler.setLevel(logging.DEBUG)
-            
-            # 设置日志格式
-            formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
-            file_handler.setFormatter(formatter)
-            console_handler.setFormatter(formatter)
-            
-            logger.addHandler(file_handler)
-            logger.addHandler(console_handler)
-        
-        logger.info("=== 开始获取文本内容 ===")
-        
-        for i, block in enumerate(self.text_blocks):
-            logger.info(f"\n处理文本块 {i+1}:")
-            
-            # 获取原始文本内容
-            raw_text = block.editor.toPlainText()
-            logger.info(f"原始文本内容: {repr(raw_text)}")
-            
-            # 统一换行符为 \n
-            text = raw_text.replace('\r\n', '\n').replace('\r', '\n')
-            
-            # 处理每一行
-            lines = text.split('\n')
-            logger.info(f"分割后的行数: {len(lines)}")
-            for j, line in enumerate(lines):
-                logger.info(f"  行 {j+1}: {repr(line)}")
-                logger.info(f"  行 {j+1} 长度: {len(line)}")
-                logger.info(f"  行 {j+1} 前导空格数: {len(line) - len(line.lstrip())}")
-            
-            # 保留原始文本，包括前导空格，只去掉尾部空格
-            text = '\n'.join(line.rstrip() for line in lines)
-            logger.info(f"处理后的文本: {repr(text)}")
-            
-            item = {
-                'type': 'title' if block.type_combo.currentText() == "标题" else 'content',
-                'text': text,
-                'line_spacing': self.line_spacing_spin.value()
-            }
-            
-            if item['type'] == 'title':
-                item['font_size'] = self.title_font_spin.value()
-            else:
-                item['font_size'] = self.content_font_spin.value()
-            
-            if text.strip():  # 只添加非空内容
-                content.append(item)
-                logger.info("文本块已添加到内容列表")
-            else:
-                logger.info("跳过空文本块")
-        
-        logger.info(f"\n=== 文本内容获取完成，共 {len(content)} 个内容块 ===")
+        for block in self.text_blocks:
+            block_content = block.get_content()
+            if block_content['text'].strip():  # 只添加非内容
+                content.append(block_content)
         return content
 
     def set_all_content(self, content_list):
+        """设置所有内容，恢复颜色信息"""
         # 清除现有的文本块
         while self.text_blocks:
             block = self.text_blocks.pop()
             block.deleteLater()
-
+        
         # 添加新的文本块
         for content in content_list:
             text_block = TextBlock()
-            text_block.set_content(content)
+            text_block.set_content(content)  # 包含颜色信息的恢复
             text_block.deleted.connect(self.remove_text_block)
             self.text_blocks.append(text_block)
             self.blocks_layout.addWidget(text_block)
-
+        
         # 如果没有内容，添加一个默认的文本块
         if not content_list:
             self.add_text_block()
-
+        
         self.content_changed.emit()
 
     def clear(self):

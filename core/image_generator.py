@@ -30,43 +30,39 @@ class ImageGenerator:
     def setup_logger(self):
         """设置日志记录器"""
         try:
-            # 根据操作系统类型设置日志目录
-            if sys.platform == 'darwin':  # macOS
-                log_dir = os.path.expanduser('~/Library/Logs/小红书文字转图片工具')
-            elif sys.platform == 'win32':  # Windows
-                log_dir = os.path.join(os.getenv('APPDATA'), '小红书文字转图片工具', 'logs')
-            else:  # Linux 或其他系统
-                log_dir = os.path.expanduser('~/.小红书文字转图片工具/logs')
-            
-            # 确保日志目录存在
-            os.makedirs(log_dir, exist_ok=True)
-            
-            # 设置日志文件路径
-            log_file = os.path.join(log_dir, 'app.log')
-            
-            # 配置日志记录
-            logging.basicConfig(
-                level=logging.DEBUG,
-                format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-                handlers=[
-                    logging.FileHandler(log_file, encoding='utf-8'),
-                    logging.StreamHandler()  # 同时输出到控制台
-                ]
-            )
-            
+            # 获取logger
             self.logger = logging.getLogger('ImageGenerator')
-            self.logger.info(f'Logger initialized. Log file: {log_file}')
+            # 避免日志向上层传递
+            self.logger.propagate = False
+            
+            # 只在没有处理器时添加处理器
+            if not self.logger.handlers:
+                self.logger.setLevel(logging.DEBUG)
+                formatter = logging.Formatter('%(levelname)s - %(message)s')
+                
+                # 根据操作系统类型设置日志目录
+                if sys.platform == 'darwin':  # macOS
+                    log_dir = os.path.expanduser('~/Library/Logs/小红书文字转图片工具')
+                elif sys.platform == 'win32':  # Windows
+                    log_dir = os.path.join(os.getenv('APPDATA'), '小红书文字转图片工具', 'logs')
+                else:  # Linux 或其他系统
+                    log_dir = os.path.expanduser('~/.小红书文字转图片工具/logs')
+                
+                # 确保日志目录存在
+                os.makedirs(log_dir, exist_ok=True)
+                
+                # 设置日志文件路径
+                log_file = os.path.join(log_dir, 'app.log')
+                
+                # 添加文件处理器
+                file_handler = logging.FileHandler(log_file, encoding='utf-8')
+                file_handler.setFormatter(formatter)
+                self.logger.addHandler(file_handler)
+                
+            self.logger.info('Logger initialized')
             
         except Exception as e:
             print(f"Error setting up logger: {str(e)}")
-            # 如果无法设置文件日志，至少设置控制台日志
-            logging.basicConfig(
-                level=logging.DEBUG,
-                format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-                handlers=[logging.StreamHandler()]
-            )
-            self.logger = logging.getLogger('ImageGenerator')
-            self.logger.error(f'Failed to setup file logger: {str(e)}')
         
     def load_fonts(self):
         """
@@ -336,7 +332,7 @@ class ImageGenerator:
             return int(height / line_spacing)
     
     def split_text_by_lines(self, text, font, max_lines, content_type):
-        """将文本按行数分割"""
+        """将���按行数分割"""
         if not text.strip():
             return None, None
             
@@ -377,7 +373,7 @@ class ImageGenerator:
     def create_single_image(self, text_content, background_path, font_style='normal'):
         """创建单个图片"""
         print("\n=== 开始创建图片 ===")
-        print(f"文本内容: {text_content.get('text', '')[:50]}...")  # 只印前50个字符
+        print(f"文本内容: {text_content.get('text', '')[:50]}...")  # 只印前50个符
         print(f"字体大小: {text_content.get('font_size', 48)}")
         print(f"是否加粗: {text_content.get('font_bold', False)}")
         
@@ -603,213 +599,132 @@ class ImageGenerator:
         return '\n'.join(processed_lines)
     
     def get_wrapped_text(self, text, font, max_width):
-        """
-        处理文本自动换行
+        """处理文本自动换行，返回带位置信息的行"""
+        wrapped_info = []
+        current_position = 0
         
-        参数:
-            text (str): 原始文本
-            font: 字体对象
-            max_width (int): 最大行宽
+        # 处理文本中的每一行
+        paragraphs = text.split('\n')
+        for i, paragraph in enumerate(paragraphs):
+            if not paragraph:  # 空行处理
+                wrapped_info.append({
+                    'text': '',
+                    'start': current_position,
+                    'end': current_position + 1
+                })
+                current_position += 1
+                continue
             
-        返回:
-            list: 换行后的文本行列表
+            # 处理实际内容
+            current_line = ""
+            line_start = current_position
+            current_width = 0
             
-        功能:
-            - 按照最大宽度自动换行
-            - 保持原有的手动换行
-            - 处理空行和段落间距
-            - 确保文本不会超出边界
-        """
-        def get_next_break_point(text, start_idx, current_width, max_width):
-            """找下一个合适的换行点"""
-            width = current_width
-            i = start_idx
-            
-            # 计算前导空格的宽度
-            while i < len(text) and text[i].isspace():
-                width += font.getlength(text[i])
-                i += 1
-            
-            while i < len(text):
-                char = text[i]
+            for char in paragraph:
                 char_width = font.getlength(char)
                 
-                if width + char_width > max_width:
-                    # 如果是第一个字符就超出宽度，至少返回这个字符的位置
-                    return i if i > start_idx else i + 1
+                # 检查是否需要换行
+                if current_width + char_width > max_width and current_line:
+                    # 添加当前行
+                    wrapped_info.append({
+                        'text': current_line,
+                        'start': line_start,
+                        'end': line_start + len(current_line)
+                    })
+                    current_line = ""
+                    current_width = 0
+                    line_start = current_position
                 
-                width += char_width
-                i += 1
+                current_line += char
+                current_width += char_width
+                current_position += 1
             
-            return i
-
-        # 检查是否是列表项，扩展匹配模式以支持多种列表标记
-        list_match = re.match(r'^(\s*)((?:\d+[.、)]|[a-z][.、)]|[-•*])\s+)(.+)$', text)
-        lines = []
+            # 添加最后一行
+            if current_line:
+                wrapped_info.append({
+                    'text': current_line,
+                    'start': line_start,
+                    'end': current_position
+                })
+            
+            # 处理段落结束
+            if i < len(paragraphs) - 1:
+                current_position += 1
         
-        if list_match:
-            # 列表项处理
-            indent = list_match.group(1)  # 缩进
-            marker = list_match.group(2)  # 列表标记
-            content = list_match.group(3)  # 实际内容
-            
-            # 计算列表标记的实际宽度
-            marker_width = sum(font.getlength(c) for c in marker)
-            
-            # 计算后续行的进宽度（缩进 + 标记的宽度）
-            indent_width = sum(font.getlength(' ') for _ in range(len(indent)))
-            total_indent_width = indent_width + marker_width
-            
-            # 计算可用宽度
-            available_width = max_width - total_indent_width
-            
-            # 处理内容部分
-            paragraphs = content.split('\n')
-            first_line = True
-            
-            for paragraph in paragraphs:
-                # 检查段落是否是新的列表项
-                sub_list_match = re.match(r'^(\s*)((?:\d+[.、)]|[a-z][.、)]|[-•*])\s+)(.+)$', paragraph)
-                if sub_list_match and not first_line:
-                    # 果是新的列表项，递归处理
-                    sub_lines = self.get_wrapped_text(paragraph, font, max_width)
-                    lines.extend(sub_lines)
-                    continue
-                    
-                # 处理段落
-                start_idx = 0
-                while start_idx < len(paragraph):
-                    # 获取下一个换行点
-                    break_point = get_next_break_point(
-                        paragraph, 
-                        start_idx, 
-                        0,
-                        available_width
-                    )
-                    
-                    # 添加行，保留前导空格
-                    line = paragraph[start_idx:break_point]
-                    if line:
-                        if first_line:
-                            # 第一行使用原始缩进和标记
-                            lines.append(indent + marker + line)
-                            first_line = False
-                        else:
-                            # 后续行使用相同宽度的空格缩进
-                            # 计算需要多少个空格来达到相同的缩进宽度
-                            space_width = font.getlength(' ')
-                            indent_spaces = ' ' * (int(total_indent_width / space_width) + 1)
-                            lines.append(indent_spaces + line)
-                    
-                    # 更新开始位置
-                    start_idx = break_point
-                
-                # 在段落之间添加空行标记
-                if paragraph != paragraphs[-1]:
-                    lines.append('\n')
-        else:
-            # 处理普通段落
-            paragraphs = text.split('\n')
-            
-            for i, paragraph in enumerate(paragraphs):
-                # 检查是否是列表项
-                list_match = re.match(r'^(\s*)((?:\d+[.、)]|[a-z][.、)]|[-•*])\s+)(.+)$', paragraph)
-                if list_match:
-                    # 如果是列表项，递归处理
-                    sub_lines = self.get_wrapped_text(paragraph, font, max_width)
-                    lines.extend(sub_lines)
-                    continue
-                    
-                # 处理空行
-                if not paragraph.strip():
-                    if i > 0 and paragraphs[i-1].strip():
-                        lines.append('\n')
-                    continue
-                
-                # 处理非空段落
-                start_idx = 0
-                while start_idx < len(paragraph):
-                    # 获取下一个换行点，保前导空格
-                    break_point = get_next_break_point(
-                        paragraph,
-                        start_idx,
-                        0,
-                        max_width
-                    )
-                    
-                    # 添加行，保留所有空格
-                    line = paragraph[start_idx:break_point]
-                    if line or line.isspace():  # 保留纯空格的行
-                        lines.append(line)
-                    
-                    # 更新开始位置
-                    start_idx = break_point
-                
-                # 在非空段落之间添加换行标记
-                if i < len(paragraphs) - 1 and paragraphs[i+1].strip():
-                    lines.append('\n')
-
-        self.logger.debug("处理后的行:")
-        for i, line in enumerate(lines):
-            self.logger.debug(f"第 {i+1} 行: '{line}'")
-        
-        return lines
+        return wrapped_info
     
     def render_text(self, draw, text_content, font):
-        """
-        渲染文本到图片
-        
-        参数:
-            draw: PIL的ImageDraw对象
-            text_content (list): 预处理后的文本内容列表
-            font: 字体对象
-            
-        功能:
-            - 处理标题和内容的不同渲染样式
-            - 支持文本居中和左对齐
-            - 处理行间距和段落间距
-            - 保持标题和内容的间距一致性
-        """
+        """渲染文本到图片，支持颜色"""
         current_y = self.margin
         last_item_type = None
+        
+        print("\n=== 开始渲染文本 ===")
         
         for item in text_content:
             if not item.get('text'):
                 continue
             
-            # 使用预处理的换行结果
-            lines = item['wrapped_lines']
+            # 获取文本和颜色信息
+            text = item['text']
+            colors = item.get('colors', [])
             font_size = item.get('font_size', 48 if item['type'] == 'title' else 32)
             line_spacing = item.get('line_spacing', 45)
+            
+            print(f"\n处理{item['type']}块:")
+            print(f"文本内容: '{text}'")
+            print(f"颜色信息: {colors}")
             
             try:
                 current_font = ImageFont.truetype(font.path, font_size)
             except Exception as e:
-                self.logger.error(f"字体加载失败: {str(e)}")
+                print(f"字体加载失败: {str(e)}")
                 continue
             
-            # 处理标题和内容块之间的间距
-            if last_item_type == 'title' and item['type'] == 'content':
-                current_y += line_spacing // 2
+            # 获取换行后的文本
+            wrapped_lines = self.get_wrapped_text(text, current_font, self.width - (self.margin * 2))
+            print(f"换行后行数: {len(wrapped_lines)}")
             
-            # 渲染每一行
-            for line in lines:
-                if not line.strip():  # 空白行
+            # 渲染每一���
+            for line_info in wrapped_lines:
+                if not line_info['text'].strip():
                     current_y += line_spacing // 2
+                    print("处理空行")
                     continue
                 
-                # 计算行的位置
+                print(f"\n渲染行: '{line_info['text']}'")
+                print(f"行位置: {line_info['start']}-{line_info['end']}")
+                
+                # 计算行的起始位置
                 if item['type'] == 'title':
-                    text_width = sum(current_font.getlength(char) for char in line)
+                    text_width = sum(current_font.getlength(char) for char in line_info['text'])
                     x = (self.width - text_width) // 2
+                    print(f"标题行，居中位置: {x}")
                 else:
                     x = self.margin
+                    print(f"内容行，左对齐位置: {x}")
                 
-                # 渲染文本
-                draw.text((x, current_y), line, font=current_font, fill='black')
+                current_x = x
+                
+                # 逐字符渲染，应用颜色
+                for i, char in enumerate(line_info['text']):
+                    char_position = line_info['start'] + i
+                    char_color = 'black'
+                    
+                    # 查找当前字符的颜色
+                    for color_info in colors:
+                        if color_info['start'] <= char_position < color_info['end']:
+                            char_color = color_info['color']
+                            print(f"字符 '{char}' 使用颜色: {char_color}")
+                            break
+                    
+                    draw.text((current_x, current_y), char, font=current_font, fill=char_color)
+                    current_x += current_font.getlength(char)
+                
                 current_y += line_spacing
             
             last_item_type = item['type']
+        
+        print("\n=== 文本渲染完成 ===")
     
     def draw_styled_text(self, draw, text, marks, x, y, font, char_spacing=0, line_spacing=20):
         """绘制带样式的文本"""
@@ -948,7 +863,7 @@ class ImageGenerator:
             PIL.ImageFont: 字体对象
             
         功能:
-            - 支持普通和粗体字体
+            - 支持普和粗体字体
             - 自动降级到系统字体
             - 处理字体加载失败的情况
             - 提供详细的日志信息
@@ -965,7 +880,7 @@ class ImageGenerator:
             print(f"是加: {is_bold}")
             print(f"选择字体文件: {font_name}")
             
-            # 获取字体路径
+            # 获取字体路
             if hasattr(sys, '_MEIPASS'):
                 font_path = os.path.join(sys._MEIPASS, 'resources', 'fonts', font_name)
             else:
@@ -996,17 +911,11 @@ class ImageGenerator:
         计算内容块的总高度
         
         参数:
-            wrapped_lines (list): 换行后的文本行列表
+            wrapped_lines (list): 含行信息的典列表
             item (dict): 内容块信息，包含类型和间距设置
             
         返回:
             int: 内容块的总高度（像素）
-            
-        功能:
-            - 计算普通行和空白行的高度
-            - 处理标题和内容的间距
-            - 考虑行间距的设置
-            - 记录调试信息
         """
         if not wrapped_lines:
             return 0
@@ -1014,8 +923,8 @@ class ImageGenerator:
         total_height = 0
         line_spacing = item.get('line_spacing', 45)
         
-        for i, line in enumerate(wrapped_lines):
-            if not line.strip():  # 空白行
+        for line_info in wrapped_lines:
+            if not line_info['text'].strip():  # 空白行
                 # 空白行使用半个行间距
                 total_height += line_spacing // 2
             else:
@@ -1023,7 +932,7 @@ class ImageGenerator:
                 total_height += line_spacing
             
             # 如果是标题块且有下一个内容块，添加额外的间距
-            if item['type'] == 'title' and i == len(wrapped_lines) - 1:
+            if item['type'] == 'title' and line_info == wrapped_lines[-1]:
                 total_height += line_spacing // 2
         
         self.logger.debug(f"内容块高度计算: {len(wrapped_lines)} 行, 总高度 {total_height}")

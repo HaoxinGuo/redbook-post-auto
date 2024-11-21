@@ -8,19 +8,26 @@ class LogoProcessor:
     def __init__(self, width, height):
         self.width = width
         self.height = height
-        self.setup_logger()
-        
-    def setup_logger(self):
-        """配置日志"""
         self.logger = logging.getLogger('LogoProcessor')
+        self.logger.propagate = False
+        
         if not self.logger.handlers:
             self.logger.setLevel(logging.DEBUG)
-            formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+            formatter = logging.Formatter('%(levelname)s - %(message)s')
             
-            # 添加控制台处理器
-            console_handler = logging.StreamHandler()
-            console_handler.setFormatter(formatter)
-            self.logger.addHandler(console_handler)
+            if sys.platform == 'darwin':  # macOS
+                log_dir = os.path.expanduser('~/Library/Logs/小红书文字转图片工具')
+            elif sys.platform == 'win32':  # Windows
+                log_dir = os.path.join(os.getenv('APPDATA'), '小红书文字转图片工具', 'logs')
+            else:  # Linux 或其他系统
+                log_dir = os.path.expanduser('~/.小红书文字转图片工具/logs')
+            
+            os.makedirs(log_dir, exist_ok=True)
+            log_file = os.path.join(log_dir, 'app.log')
+            
+            file_handler = logging.FileHandler(log_file, encoding='utf-8')
+            file_handler.setFormatter(formatter)
+            self.logger.addHandler(file_handler)
     
     def add_logo(self, images):
         """为图片添加Logo"""
