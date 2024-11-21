@@ -153,40 +153,25 @@ class TextBlock(QWidget):
         
         for block_num in range(doc.blockCount()):
             block = doc.findBlockByNumber(block_num)
+            block_text = block.text()
+            block_length = len(block_text)
             
             print(f"\n处理文本块 {block_num + 1}:")
-            print(f"块文本: '{block.text()}'")
+            print(f"块文本: '{block_text}'")
             
-            # 直接遍历文本块中的字符格式
-            cursor = self.editor.textCursor()
-            cursor.setPosition(block.position())
-            cursor.movePosition(cursor.MoveOperation.EndOfBlock, cursor.MoveMode.KeepAnchor)
-            
-            # 获取选中文本的格式
-            block_format = cursor.charFormat()
-            if block_format.foreground().style() != 0:  # 检查是否设置了前景色
-                color = block_format.foreground().color()
-                if color.isValid() and color.name() != '#000000':
-                    color_info = {
-                        'start': current_position,
-                        'end': current_position + len(block.text()),
-                        'color': color.name()
-                    }
-                    colors.append(color_info)
-                    print(f"发现块级颜色: {color.name()}")
-                    print(f"颜色范围: {color_info['start']}-{color_info['end']}")
-            
-            # 逐字符检查颜色
-            for i in range(len(block.text())):
+            # 处理块内的每个字符
+            for i in range(block_length):
+                cursor = self.editor.textCursor()
                 cursor.setPosition(block.position() + i)
                 cursor.movePosition(cursor.MoveOperation.Right, cursor.MoveMode.KeepAnchor)
-                char_format = cursor.charFormat()
                 
+                char_format = cursor.charFormat()
                 if char_format.foreground().style() != 0:  # 检查是否设置了前景色
                     color = char_format.foreground().color()
                     if color.isValid() and color.name() != '#000000':
                         # 尝试合并连续的相同颜色
-                        if colors and colors[-1]['color'] == color.name() and colors[-1]['end'] == current_position + i:
+                        if colors and colors[-1]['color'] == color.name() and \
+                           colors[-1]['end'] == current_position + i:
                             colors[-1]['end'] = current_position + i + 1
                         else:
                             color_info = {
@@ -199,17 +184,18 @@ class TextBlock(QWidget):
             
             # 更新位置计数器
             if block_num < doc.blockCount() - 1:
-                text += block.text() + '\n'
-                current_position += len(block.text()) + 1
+                text += block_text + '\n'
+                current_position += block_length + 1
                 print("添加换行符，位置更新")
             else:
-                text += block.text()
-                current_position += len(block.text())
+                text += block_text
+                current_position += block_length
         
         # 合并连续的相同颜色区域
         merged_colors = []
         for color_info in colors:
-            if merged_colors and merged_colors[-1]['color'] == color_info['color'] and merged_colors[-1]['end'] == color_info['start']:
+            if merged_colors and merged_colors[-1]['color'] == color_info['color'] and \
+               merged_colors[-1]['end'] == color_info['start']:
                 merged_colors[-1]['end'] = color_info['end']
             else:
                 merged_colors.append(color_info)
@@ -264,6 +250,8 @@ class TextBlock(QWidget):
             print(f"选择的颜色: {color.name()}")
             fmt = QTextCharFormat()
             fmt.setForeground(color)
+            
+            # 只对选中的文本应用颜色
             cursor.mergeCharFormat(fmt)
             print("颜色设置成功")
         else:

@@ -357,7 +357,7 @@ class ImageGenerator:
     def create_single_image(self, text_content, background_path, font_style='normal'):
         """创建单个图片"""
         print("\n=== 开始创建图片 ===")
-        print(f"文本内容: {text_content.get('text', '')[:50]}...")  # 只印前50个符
+        print(f"文本: {text_content.get('text', '')[:50]}...")  # 只印前50个符
         print(f"字体大小: {text_content.get('font_size', 48)}")
         print(f"是否加粗: {text_content.get('font_bold', False)}")
         
@@ -390,7 +390,7 @@ class ImageGenerator:
         print(f"字间距: {char_spacing}")
         print(f"样式标记数: {len(marks)}")
         
-        # 创建字体对象，传入加粗参数
+        # 创建字体��象，传入加粗参数
         font = self.create_font(font_size, is_bold)
         print(f"体对象创建结果: {font}")
         
@@ -472,7 +472,7 @@ class ImageGenerator:
         """处理文本中的列表"""
         lines = text.split('\n')
         processed_lines = []
-        list_stack = []  # 用于跟踪套列表
+        list_stack = []  # 用于跟踪嵌套列表
         
         # 扩展列表标记正则表达式
         ordered_patterns = [
@@ -482,7 +482,7 @@ class ImageGenerator:
         ]
         unordered_patterns = [
             r'[-•*]\s+(.+)',        # 常规无序列表标记
-            r'[○◆◇]\s+(.+)'      # 其他无列表标记
+            r'[○◆◇]\s+(.+)'      # 其他无序列表标记
         ]
         
         def get_indent_level(line):
@@ -490,7 +490,7 @@ class ImageGenerator:
             return len(line) - len(line.lstrip())
         
         def is_ordered_list(line):
-            """检查是否是有序列表项"""
+            """检查是否是有��列表项"""
             for pattern in ordered_patterns:
                 match = re.match(pattern, line.lstrip())
                 if match:
@@ -507,90 +507,69 @@ class ImageGenerator:
         
         # 用于跟踪每个缩进级别的编号
         current_list_number = {}
-        # 用于跟踪每个缩进级的起始值
-        list_start_numbers = {}
         
         for line in lines:
             if not line.strip():
                 processed_lines.append('')
                 continue
-                
+            
             indent_level = get_indent_level(line)
             stripped_line = line.lstrip()
-            
-            # 根据缩进调整列表堆栈
-            while list_stack and list_stack[-1]['indent'] >= indent_level:
-                popped = list_stack.pop()
-                # 当退出一个缩进级别时，清除该级别的编号记录
-                if popped['indent'] in current_list_number:
-                    del current_list_number[popped['indent']]
             
             # 检查是否是有序列表
             ordered_match = is_ordered_list(stripped_line)
             if ordered_match:
                 marker, content = ordered_match.groups()
                 
-                # 如果新的缩进级别或新的列表开始
-                if indent_level not in current_list_number:
-                    # 保存起始编号
-                    if marker.isalpha():
-                        start_num = ord(marker.lower()) - ord('a') + 1
-                    else:
-                        start_num = int(marker)
-                    current_list_number[indent_level] = start_num
-                    list_start_numbers[indent_level] = start_num
-                else:
-                    # 使用已存在的编号
-                    current_list_number[indent_level] += 1
+                # 计算实际缩进
+                indent_spaces = self.list_indent * (indent_level + 1)  # 基础缩进加上层级缩进
+                indent = ' ' * indent_spaces
                 
-                list_stack.append({
-                    'type': 'ordered',
-                    'indent': indent_level,
-                    'counter': current_list_number[indent_level],
-                    'marker_type': 'alpha' if marker.isalpha() else 'numeric'
-                })
-                
-                # 生成适当的标记
-                if list_stack[-1]['marker_type'] == 'alpha':
-                    marker = chr(ord('a') + current_list_number[indent_level] - 1)
+                # 格式化列表标记
+                if marker.isalpha():
                     formatted_marker = f"{marker}."
                 else:
-                    formatted_marker = f"{current_list_number[indent_level]}."
+                    formatted_marker = f"{marker}."
                 
-                indent = ' ' * indent_level
                 processed_lines.append(f"{indent}{formatted_marker} {content}")
                 
-            # 检查是否无序列表
+            # 检查是否是无序列表
             elif is_unordered_list(stripped_line):
                 content = is_unordered_list(stripped_line).group(1)
                 
-                list_stack.append({
-                    'type': 'unordered',
-                    'indent': indent_level
-                })
+                # 计算实际缩进
+                indent_spaces = self.list_indent * (indent_level + 1)  # 基础缩进加上层级缩进
+                indent = ' ' * indent_spaces
                 
-                indent = ' ' * indent_level
                 processed_lines.append(f"{indent}• {content}")
                 
             else:
                 # 普通文本行
                 processed_lines.append(line)
-                if not line.strip():
-                    list_stack = []
-                    current_list_number = {}
-                    list_start_numbers = {}
-            
+        
         return '\n'.join(processed_lines)
     
     def get_wrapped_text(self, text, font, max_width):
-        """处理文本自动换行，返回带位置信息的行"""
+        """处理文本自动换行，返回带位置信息的行，支持列表缩进"""
         wrapped_info = []
         current_position = 0
         
+        # 列表标记的正则表达式
+        list_pattern = r'^(\s*)((?:\d+[.、)]|[a-zA-Z][.、)]|[-•*○◆◇])\s+)(.+)$'
+        
+        print("\n=== 开始处理文本换行 ===")
+        print(f"最大宽度: {max_width}")
+        
         # 处理文本中的每一行
         paragraphs = text.split('\n')
+        print(f"总段落数: {len(paragraphs)}")
+        
         for i, paragraph in enumerate(paragraphs):
+            print(f"\n处理段落 {i+1}:")
+            print(f"原始文本: '{paragraph}'")
+            
             if not paragraph:  # 空行处理
+                print("空行处理")
                 wrapped_info.append({
                     'text': '',
                     'start': current_position,
@@ -599,48 +578,151 @@ class ImageGenerator:
                 current_position += 1
                 continue
             
-            # 处理实际内容
-            current_line = ""
-            line_start = current_position
-            current_width = 0
-            
-            for char in paragraph:
-                char_width = font.getlength(char)
+            # 检查是否是列表项
+            list_match = re.match(list_pattern, paragraph)
+            if list_match:
+                print("检测到列表项")
+                # 提取列表项的组成部分
+                leading_spaces, list_marker, content = list_match.groups()
+                print(f"前导空格: '{leading_spaces}'")
+                print(f"列表标记: '{list_marker}'")
+                print(f"列表内容: '{content}'")
                 
-                # 检是否需要换行
-                if current_width + char_width > max_width and current_line:
-                    # 添加当前行
+                indent = leading_spaces + list_marker  # 缩进包括前导空格和标记
+                indent_width = font.getlength(indent)
+                print(f"缩进宽度: {indent_width}")
+                
+                # 处理第一行（包含列表标记）
+                current_line = paragraph
+                line_start = current_position
+                current_width = font.getlength(current_line)
+                print(f"第一行宽度: {current_width}")
+                
+                # 如果第一行太长，需要分行处理
+                if current_width > max_width:
+                    print("第一行需要换行处理")
+                    # 先添加列表标记和能放下的内容
+                    break_point = len(indent)
+                    test_width = indent_width
+                    
+                    # 逐字符尝试添加内容
+                    for char in content:
+                        char_width = font.getlength(char)
+                        if test_width + char_width <= max_width:
+                            break_point += 1
+                            test_width += char_width
+                        else:
+                            break
+                    
+                    # 添加第一行
+                    first_line = current_line[:break_point]
+                    print(f"第一行文本: '{first_line}'")
+                    wrapped_info.append({
+                        'text': first_line,
+                        'start': line_start,
+                        'end': line_start + len(first_line),
+                        'is_list_item': True,
+                        'indent': indent
+                    })
+                    current_position += len(first_line)
+                    
+                    # 处理剩余内容
+                    remaining_content = current_line[break_point:].lstrip()
+                    print(f"剩余内容: '{remaining_content}'")
+                    
+                    while remaining_content:
+                        # 创建带缩进的新行
+                        continuation_indent = ' ' * len(indent)  # 后续行使用空格缩进
+                        indented_line = continuation_indent + remaining_content
+                        print(f"带缩进的新行: '{indented_line}'")
+                        
+                        # 计算可以放入的文本长度
+                        break_point = len(continuation_indent)
+                        test_width = font.getlength(continuation_indent)
+                        
+                        # 逐字符尝试添加内容
+                        for char in remaining_content:
+                            char_width = font.getlength(char)
+                            if test_width + char_width <= max_width:
+                                break_point += 1
+                                test_width += char_width
+                            else:
+                                break
+                        
+                        # 添加换行后的内容
+                        wrapped_line = indented_line[:break_point]
+                        print(f"换行后内容: '{wrapped_line}'")
+                        wrapped_info.append({
+                            'text': wrapped_line,
+                            'start': current_position,
+                            'end': current_position + len(wrapped_line),
+                            'is_list_item': True,
+                            'indent': continuation_indent
+                        })
+                        
+                        current_position += len(wrapped_line)
+                        remaining_content = indented_line[break_point:].lstrip()
+                        print(f"更新后的剩余内容: '{remaining_content}'")
+                else:
+                    print("第一行不需要换行")
                     wrapped_info.append({
                         'text': current_line,
                         'start': line_start,
-                        'end': line_start + len(current_line)
+                        'end': line_start + len(current_line),
+                        'is_list_item': True,
+                        'indent': indent
                     })
-                    current_line = ""
-                    current_width = 0
-                    line_start = current_position
+                    current_position += len(current_line)
+            else:
+                print("普通文本处理")
+                # 非列表项的普通文本处理
+                current_line = ""
+                line_start = current_position
+                current_width = 0
                 
-                current_line += char
-                current_width += char_width
-                current_position += 1
-            
-            # 添加最后一行
-            if current_line:
-                wrapped_info.append({
-                    'text': current_line,
-                    'start': line_start,
-                    'end': current_position
-                })
+                for char in paragraph:
+                    char_width = font.getlength(char)
+                    
+                    if current_width + char_width > max_width and current_line:
+                        # 添加当前行
+                        print(f"添加普通行: '{current_line}'")
+                        wrapped_info.append({
+                            'text': current_line,
+                            'start': line_start,
+                            'end': line_start + len(current_line)
+                        })
+                        current_line = ""
+                        current_width = 0
+                        line_start = current_position
+                    
+                    current_line += char
+                    current_width += char_width
+                    current_position += 1
+                
+                # 添加最后一行
+                if current_line:
+                    print(f"添加最后一行: '{current_line}'")
+                    wrapped_info.append({
+                        'text': current_line,
+                        'start': line_start,
+                        'end': current_position
+                    })
             
             # 处理段落结束
             if i < len(paragraphs) - 1:
                 current_position += 1
         
+        print("\n处理结果:")
+        for i, line in enumerate(wrapped_info):
+            print(f"行 {i+1}: '{line['text']}'")
+            if line.get('is_list_item'):
+                print(f"  缩进: '{line['indent']}'")
+        
         return wrapped_info
     
     def render_text(self, draw, text_content, font):
-        """渲染文本到图片，支持颜色"""
+        """渲染文本到图片，支持颜色和列表缩进"""
         current_y = self.margin
-        last_item_type = None
         
         print("\n=== 开始渲染文本 ===")
         
@@ -649,14 +731,9 @@ class ImageGenerator:
                 continue
             
             # 获取文本和颜色信息
-            text = item['text']
             colors = item.get('colors', [])
             font_size = item.get('font_size', 48 if item['type'] == 'title' else 32)
             line_spacing = item.get('line_spacing', 45)
-            
-            print(f"\n处理{item['type']}块:")
-            print(f"文本内容: '{text}'")
-            print(f"颜色信息: {colors}")
             
             try:
                 current_font = ImageFont.truetype(font.path, font_size)
@@ -665,48 +742,43 @@ class ImageGenerator:
                 continue
             
             # 获取换行后的文本
-            wrapped_lines = self.get_wrapped_text(text, current_font, self.width - (self.margin * 2))
-            print(f"换行后行数: {len(wrapped_lines)}")
+            wrapped_lines = item.get('wrapped_lines', [])
             
-            # 渲染每一
+            # 渲染每一行
             for line_info in wrapped_lines:
                 if not line_info['text'].strip():
                     current_y += line_spacing // 2
-                    print("处理空行")
                     continue
-                
-                print(f"\n渲染行: '{line_info['text']}'")
-                print(f"行位置: {line_info['start']}-{line_info['end']}")
                 
                 # 计算行的起始位置
                 if item['type'] == 'title':
                     text_width = sum(current_font.getlength(char) for char in line_info['text'])
                     x = (self.width - text_width) // 2
-                    print(f"标题行，居中位置: {x}")
                 else:
                     x = self.margin
-                    print(f"内容行，左对齐位置: {x}")
+                    if line_info.get('is_list_item'):
+                        # 使用缩进信息
+                        indent = line_info.get('indent', '')
+                        x += current_font.getlength(indent)
                 
                 current_x = x
                 
                 # 逐字符渲染，应用颜色
+                text_start = line_info['start']
                 for i, char in enumerate(line_info['text']):
-                    char_position = line_info['start'] + i
+                    char_position = text_start + i
                     char_color = 'black'
                     
                     # 查找当前字符的颜色
                     for color_info in colors:
                         if color_info['start'] <= char_position < color_info['end']:
                             char_color = color_info['color']
-                            print(f"字符 '{char}' 使用颜色: {char_color}")
                             break
                     
                     draw.text((current_x, current_y), char, font=current_font, fill=char_color)
                     current_x += current_font.getlength(char)
                 
                 current_y += line_spacing
-            
-            last_item_type = item['type']
         
         print("\n=== 文本渲染完成 ===")
     
