@@ -25,7 +25,7 @@ class TextBlock(QWidget):
         self.type_combo.currentTextChanged.connect(self.on_type_changed)
         layout.addWidget(self.type_combo)
 
-        # 创建一个包含文本编辑框和删除按钮的容器
+        # 创建一个包含文本编辑框和按钮的容器
         editor_container = QWidget()
         editor_layout = QHBoxLayout(editor_container)
         editor_layout.setContentsMargins(0, 0, 0, 0)
@@ -33,10 +33,8 @@ class TextBlock(QWidget):
 
         # 文本编辑框
         self.editor = QTextEdit()
-        # 启用自动换行，但使用单词边界
         self.editor.setLineWrapMode(QTextEdit.LineWrapMode.WidgetWidth)
-        self.editor.setAcceptRichText(False)  # 只接受纯文本
-        # 设置文本编辑框的样式
+        self.editor.setAcceptRichText(True)  # 允许富文本
         self.editor.setStyleSheet("""
             QTextEdit {
                 padding: 10px;
@@ -52,18 +50,40 @@ class TextBlock(QWidget):
         """)
         editor_layout.addWidget(self.editor)
 
+        # 创建按钮容器
+        button_container = QWidget()
+        button_layout = QHBoxLayout(button_container)
+        button_layout.setContentsMargins(0, 0, 0, 0)
+        button_layout.setSpacing(5)
+
+        # 颜色选择按钮
+        self.color_button = QPushButton("文字颜色")
+        self.color_button.setFixedSize(80, 30)
+        self.color_button.clicked.connect(self.choose_color)
+        self.color_button.setStyleSheet("""
+            QPushButton {
+                background-color: #ffffff;
+                border: 1px solid #d9d9d9;
+                border-radius: 4px;
+                padding: 5px;
+            }
+            QPushButton:hover {
+                border-color: #4096ff;
+                color: #4096ff;
+            }
+        """)
+        button_layout.addWidget(self.color_button)
+
         # 删除按钮
-        delete_button = QPushButton("X")
-        delete_button.setFixedSize(20, 20)  # 设置固定大小
+        delete_button = QPushButton("删除")
+        delete_button.setFixedSize(40, 30)
         delete_button.clicked.connect(lambda: self.deleted.emit(self))
         delete_button.setStyleSheet("""
             QPushButton {
-                background-color: #ff4d4f;
-                color: white;
-                border: none;
-                border-radius: 6px;
-                font-size: 16px;
-                font-weight: bold;
+                background-color: #ffffff;
+                border: 1px solid #d9d9d9;
+                border-radius: 4px;
+                padding: 5px;
             }
             QPushButton:hover {
                 background-color: #ff7875;
@@ -72,7 +92,10 @@ class TextBlock(QWidget):
                 background-color: #d9363e;
             }
         """)
-        editor_layout.addWidget(delete_button)
+        button_layout.addWidget(delete_button)
+
+        # 将按钮容器添加到编辑器布局
+        editor_layout.addWidget(button_container)
 
         # 将容器添加到主布局
         layout.addWidget(editor_container)
@@ -119,45 +142,69 @@ class TextBlock(QWidget):
             """)
 
     def get_content(self):
-        """获取文本内容，保留用户手动输入的换行符和前导空格"""
-        # 获取原始文本内容
-        text = self.editor.toPlainText()
-        print("\n=== 获取文本内容 ===")
-        print(f"原始文本:\n{repr(text)}")
-        
-        # 获取文档对象
+        """获取文本内容，包括颜色信息"""
         doc = self.editor.document()
+        text = ""
+        colors = []
         
-        # 收集实际文本内容
-        real_text = []
-        block = doc.begin()
-        while block.isValid():
-            # 检查这个文本块是否是由软换行产生的
-            if block.layout().lineCount() > 0:
-                # 获取完整的文本行，包括前导空格
-                line = block.text()
-                print(f"块 {block.blockNumber()} 内容: {repr(line)}")
+        for block_num in range(doc.blockCount()):
+            block = doc.findBlockByNumber(block_num)
+            fragment = block.begin()
+            
+            while fragment != block.end():
+                fragment_format = fragment.charFormat()
+                color = fragment_format.foreground().color()
                 
-                # 只有当这个块是由用户手动换行产生的时候，才添加换行符
-                if block.blockNumber() < doc.blockCount() - 1:
-                    real_text.append(line + '\n')
-                else:
-                    real_text.append(line)
-            block = block.next()
-        
-        # 合并文本
-        final_text = ''.join(real_text)
-        print(f"最终文本:\n{repr(final_text)}")
+                if color.isValid():
+                    colors.append({
+                        'start': len(text),
+                        'end': len(text) + fragment.length(),
+                        'color': color.name()
+                    })
+                    
+                text += fragment.text()
+                fragment = fragment.next()
+                
+            if block_num < doc.blockCount() - 1:
+                text += '\n'
         
         return {
             'type': 'title' if self.type_combo.currentText() == "标题" else 'content',
-            'text': final_text
+            'text': text,
+            'colors': colors
         }
 
     def set_content(self, content):
-        # 设置文本内容，保持原有的换行
+        """设置文本内容，恢复颜色信息"""
+        from PyQt6.QtGui import QTextCharFormat, QColor
+        
         self.editor.setPlainText(content.get('text', ''))
         self.type_combo.setCurrentText("标题" if content.get('type') == 'title' else "内容")
+        
+        # 恢复颜色信息
+        for color_info in content.get('colors', []):
+            cursor = self.editor.textCursor()
+            cursor.setPosition(color_info['start'])
+            cursor.setPosition(color_info['end'], cursor.MoveMode.KeepAnchor)
+            
+            fmt = QTextCharFormat()
+            fmt.setForeground(QColor(color_info['color']))
+            cursor.mergeCharFormat(fmt)
+
+    def choose_color(self):
+        """打开颜色选择对话框并设置所选文本的颜色"""
+        from PyQt6.QtWidgets import QColorDialog
+        from PyQt6.QtGui import QTextCharFormat, QColor
+        
+        cursor = self.editor.textCursor()
+        if not cursor.hasSelection():
+            return
+        
+        color = QColorDialog.getColor()
+        if color.isValid():
+            fmt = QTextCharFormat()
+            fmt.setForeground(color)
+            cursor.mergeCharFormat(fmt)
 
 class TextEditor(QWidget):
     content_changed = pyqtSignal()  # 内容变化信号
