@@ -107,7 +107,7 @@ class TextBlock(QWidget):
         """根据类型调整编辑框高度"""
         if text == "标题":
             self.editor.setMinimumHeight(50)  # 减小标题最小高度
-            self.editor.setMaximumHeight(50)  # 减小标题最大高度
+            self.editor.setMaximumHeight(50)  # 减标题最大高度
             # 设置标题的字体大小
             self.editor.setStyleSheet("""
                 QTextEdit {
@@ -151,16 +151,36 @@ class TextBlock(QWidget):
         print("\n=== 获取文本内容和颜色信息 ===")
         print(f"文本块类型: {self.type_combo.currentText()}")
         
+        # 获取父窗口的字体和行间距设置
+        parent = self.parent()
+        while parent and not hasattr(parent, 'title_font_spin'):
+            parent = parent.parent()
+        
+        # 获取字体大小和行间距设置
+        if parent:
+            font_size = (parent.title_font_spin.value() 
+                        if self.type_combo.currentText() == "标题" 
+                        else parent.content_font_spin.value())
+            line_spacing = parent.line_spacing_spin.value()
+            print(f"从父窗口获取设置 - 字体大小: {font_size}, 行间距: {line_spacing}")
+        else:
+            font_size = 48 if self.type_combo.currentText() == "标题" else 32
+            line_spacing = 45
+            print(f"使用默认设置 - 字体大小: {font_size}, 行间距: {line_spacing}")
+        
+        # 先获取完整文本和颜色信息
+        text_with_colors = []
         for block_num in range(doc.blockCount()):
             block = doc.findBlockByNumber(block_num)
             block_text = block.text()
-            block_length = len(block_text)
+            block_colors = []
             
             print(f"\n处理文本块 {block_num + 1}:")
             print(f"块文本: '{block_text}'")
+            print(f"当前位置: {current_position}")
             
-            # 处理块内的每个字符
-            for i in range(block_length):
+            # 处理块内的每个字符的颜色
+            for i in range(len(block_text)):
                 cursor = self.editor.textCursor()
                 cursor.setPosition(block.position() + i)
                 cursor.movePosition(cursor.MoveOperation.Right, cursor.MoveMode.KeepAnchor)
@@ -169,46 +189,59 @@ class TextBlock(QWidget):
                 if char_format.foreground().style() != 0:  # 检查是否设置了前景色
                     color = char_format.foreground().color()
                     if color.isValid() and color.name() != '#000000':
-                        # 尝试合并连续的相同颜色
-                        if colors and colors[-1]['color'] == color.name() and \
-                           colors[-1]['end'] == current_position + i:
-                            colors[-1]['end'] = current_position + i + 1
-                        else:
-                            color_info = {
-                                'start': current_position + i,
-                                'end': current_position + i + 1,
-                                'color': color.name()
-                            }
-                            colors.append(color_info)
-                            print(f"发现字符颜色: {color.name()} at position {current_position + i}")
-            
-            # 更新位置计数器
-            if block_num < doc.blockCount() - 1:
-                text += block_text + '\n'
-                current_position += block_length + 1
-                print("添加换行符，位置更新")
-            else:
-                text += block_text
-                current_position += block_length
+                        block_colors.append({
+                            'position': current_position + i,  # 使用绝对位置
+                            'color': color.name()
+                        })
+                        print(f"字符 '{block_text[i]}' 位置 {current_position + i} 颜色: {color.name()}")
         
-        # 合并连续的相同颜色区域
-        merged_colors = []
-        for color_info in colors:
-            if merged_colors and merged_colors[-1]['color'] == color_info['color'] and \
-               merged_colors[-1]['end'] == color_info['start']:
-                merged_colors[-1]['end'] = color_info['end']
-            else:
-                merged_colors.append(color_info)
+            text_with_colors.append({
+                'text': block_text,
+                'colors': block_colors
+            })
+            
+            # 更新位置计数器，包括当前块的文本长度
+            current_position += len(block_text)
+            # 如果不是最后一个块，添加换行符的位置
+            if block_num < doc.blockCount() - 1:
+                current_position += 1
+                print(f"块结束，添加换行符，位置更新到: {current_position}")
+        
+        # 合并文本和颜色信息
+        text = ""
+        colors = []
+        current_position = 0
+        
+        for block in text_with_colors:
+            # 添加文本
+            if text:  # 如果不是第一个块，添加换行符
+                text += '\n'
+            text += block['text']
+            
+            # 添加颜色信息
+            for color_info in block['colors']:
+                # 尝试合并连续的相同颜色
+                if colors and colors[-1]['color'] == color_info['color'] and \
+                   colors[-1]['end'] == color_info['position']:
+                    colors[-1]['end'] = color_info['position'] + 1
+                else:
+                    colors.append({
+                        'start': color_info['position'],
+                        'end': color_info['position'] + 1,
+                        'color': color_info['color']
+                    })
         
         print(f"\n最终文本: '{text}'")
-        print(f"颜色信息: {merged_colors}")
+        print(f"颜色信息: {colors}")
+        print(f"最终设置 - 字体大小: {font_size}, 行间距: {line_spacing}")
         print("=== 内容获取完成 ===\n")
         
         return {
             'type': 'title' if self.type_combo.currentText() == "标题" else 'content',
             'text': text,
-            'colors': merged_colors,
-            'line_spacing': 45
+            'colors': colors,
+            'font_size': font_size,
+            'line_spacing': line_spacing
         }
 
     def set_content(self, content):
@@ -264,7 +297,7 @@ class TextEditor(QWidget):
         super().__init__(parent)
         self.text_blocks = []
         self.init_ui()
-        # 添加一个默认的标题文本块
+        # 添加一个默认标题文本块
         first_block = TextBlock()
         first_block.deleted.connect(self.remove_text_block)
         first_block.type_combo.setCurrentText("标题")  # 设置第一个文本块为标题类型
@@ -368,6 +401,15 @@ class TextEditor(QWidget):
 
         # 将内容容器添加到主布局
         layout.addWidget(content_container)
+
+        # 添加设置变化的监听
+        self.title_font_spin.valueChanged.connect(self.on_settings_changed)
+        self.content_font_spin.valueChanged.connect(self.on_settings_changed)
+        self.line_spacing_spin.valueChanged.connect(self.on_settings_changed)
+
+    def on_settings_changed(self):
+        """当设置改变时触发内容变化信号"""
+        self.content_changed.emit()
 
     def add_text_block(self):
         """添加新的文本块"""

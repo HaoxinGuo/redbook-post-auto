@@ -176,45 +176,56 @@ class ImageGenerator:
                     
                     # 判断是否需要分页
                     if current_y + total_height > max_y:
-                        if not current_page_content:  # 如果是页面第一个内容，至少放一行
-                            print("内容块太大，但是是页面第一个内容，尝试放入部分内容")
-                            # 计算可以放入多少行
-                            available_height = max_y - current_y
-                            lines_that_fit = 0
-                            height_used = 0
-                            
-                            for line in current_item['wrapped_lines']:
-                                next_line_height = line_spacing if line['text'].strip() else line_spacing // 2
-                                if height_used + next_line_height <= available_height:
-                                    lines_that_fit += 1
-                                    height_used += next_line_height
-                                else:
-                                    break
-                            
-                            print(f"可以放入 {lines_that_fit} 行，使用高度 {height_used}")
-                            
-                            if lines_that_fit > 0:
-                                # 分割内容
-                                page_item = dict(current_item)
-                                page_item['wrapped_lines'] = current_item['wrapped_lines'][:lines_that_fit]
-                                current_page_content.append(page_item)
-                                
-                                # 更新剩余内容
-                                remaining_item = dict(current_item)
-                                remaining_item['wrapped_lines'] = current_item['wrapped_lines'][lines_that_fit:]
-                                remaining_content[0] = remaining_item
-                                
-                                print(f"内容已分割：当前页 {lines_that_fit} 行，剩余 {len(remaining_item['wrapped_lines'])} 行")
+                        # 计算可以放入多少行
+                        available_height = max_y - current_y
+                        lines_that_fit = 0
+                        height_used = 0
+                        
+                        for line in current_item['wrapped_lines']:
+                            next_line_height = line_spacing if line['text'].strip() else line_spacing // 2
+                            if height_used + next_line_height <= available_height:
+                                lines_that_fit += 1
+                                height_used += next_line_height
+                            else:
                                 break
-                        else:
-                            print("内容块太大，且不是页面第一个内容，开始新页面")
-                            break
-                    
-                    # 如果内容可以完全放入当前页面
-                    current_page_content.append(current_item)
-                    current_y += total_height
-                    remaining_content.pop(0)
-                    print(f"内容块已添加到当前页面，更新Y坐标到: {current_y}")
+                        
+                        print(f"可以放入 {lines_that_fit} 行，使用高度 {height_used}")
+                        
+                        if lines_that_fit > 0:
+                            # 分割内容
+                            page_item = dict(current_item)
+                            page_item['wrapped_lines'] = current_item['wrapped_lines'][:lines_that_fit]
+                            
+                            # 调整颜色信息
+                            if 'colors' in current_item:
+                                total_chars = sum(len(line['text']) + 1 for line in page_item['wrapped_lines'])
+                                page_item['colors'] = self.adjust_color_info(current_item['colors'], 0, total_chars)
+                            
+                            current_page_content.append(page_item)
+                            current_y += height_used
+                            
+                            # 更新剩余内容
+                            remaining_item = dict(current_item)
+                            remaining_item['wrapped_lines'] = current_item['wrapped_lines'][lines_that_fit:]
+                            
+                            # 调整剩余内容的颜色信息
+                            if 'colors' in current_item:
+                                total_chars_processed = sum(len(line['text']) + 1 for line in current_item['wrapped_lines'][:lines_that_fit])
+                                remaining_item['colors'] = self.adjust_color_info(
+                                    current_item['colors'],
+                                    total_chars_processed,
+                                    float('inf')
+                                )
+                            
+                            remaining_content[0] = remaining_item
+                            print(f"内容已分割：当前页 {lines_that_fit} 行，剩余 {len(remaining_item['wrapped_lines'])} 行")
+                        break
+                    else:
+                        # 如果内容可以完全放入当前页面
+                        current_page_content.append(current_item)
+                        current_y += total_height
+                        remaining_content.pop(0)
+                        print(f"内容块已添加到当前页面，更新Y坐标到: {current_y}")
                 
                 # 渲染当前页面的内容
                 if current_page_content:
@@ -243,7 +254,7 @@ class ImageGenerator:
             if not item.get('text', '').strip():
                 continue
                 
-            # 使用内容块自带的字体大小
+            # 使内容块自带的字体大小
             font_size = item.get('font_size', 48 if item['type'] == 'title' else 32)
             line_spacing = item.get('line_spacing', 60 if item['type'] == 'title' else 45)
             
@@ -390,7 +401,7 @@ class ImageGenerator:
         print(f"字间距: {char_spacing}")
         print(f"样式标记数: {len(marks)}")
         
-        # 创建字体��象，传入加粗参数
+        # 创建字体象，传入加粗参数
         font = self.create_font(font_size, is_bold)
         print(f"体对象创建结果: {font}")
         
@@ -490,7 +501,7 @@ class ImageGenerator:
             return len(line) - len(line.lstrip())
         
         def is_ordered_list(line):
-            """检查是否是有��列表项"""
+            """检查是否是有列表项"""
             for pattern in ordered_patterns:
                 match = re.match(pattern, line.lstrip())
                 if match:
@@ -584,23 +595,21 @@ class ImageGenerator:
                 print("检测到列表项")
                 # 提取列表项的组成部分
                 leading_spaces, list_marker, content = list_match.groups()
-                print(f"前导空格: '{leading_spaces}'")
-                print(f"列表标记: '{list_marker}'")
-                print(f"列表内容: '{content}'")
-                
-                indent = leading_spaces + list_marker  # 缩进包括前导空格和标记
+                indent = leading_spaces + list_marker
                 indent_width = font.getlength(indent)
+                
+                # 记录缩进长度，用于颜色位置的调整
+                indent_length = len(indent)
+                print(f"缩进字符长度: {indent_length}")
                 print(f"缩进宽度: {indent_width}")
                 
                 # 处理第一行（包含列表标记）
                 current_line = paragraph
                 line_start = current_position
                 current_width = font.getlength(current_line)
-                print(f"第一行宽度: {current_width}")
                 
                 # 如果第一行太长，需要分行处理
                 if current_width > max_width:
-                    print("第一行需要换行处理")
                     # 先添加列表标记和能放下的内容
                     break_point = len(indent)
                     test_width = indent_width
@@ -622,17 +631,16 @@ class ImageGenerator:
                         'start': line_start,
                         'end': line_start + len(first_line),
                         'is_list_item': True,
-                        'indent': indent
+                        'indent': indent,
+                        'indent_length': indent_length
                     })
                     current_position += len(first_line)
                     
                     # 处理剩余内容
                     remaining_content = current_line[break_point:].lstrip()
-                    print(f"剩余内容: '{remaining_content}'")
-                    
                     while remaining_content:
                         # 创建带缩进的新行
-                        continuation_indent = ' ' * len(indent)  # 后续行使用空格缩进
+                        continuation_indent = ' ' * len(indent)
                         indented_line = continuation_indent + remaining_content
                         print(f"带缩进的新行: '{indented_line}'")
                         
@@ -657,20 +665,23 @@ class ImageGenerator:
                             'start': current_position,
                             'end': current_position + len(wrapped_line),
                             'is_list_item': True,
-                            'indent': continuation_indent
+                            'indent': continuation_indent,
+                            'indent_length': len(continuation_indent)
                         })
                         
                         current_position += len(wrapped_line)
                         remaining_content = indented_line[break_point:].lstrip()
                         print(f"更新后的剩余内容: '{remaining_content}'")
                 else:
+                    # 如果第一行不需要换行，直接添加
                     print("第一行不需要换行")
                     wrapped_info.append({
                         'text': current_line,
                         'start': line_start,
                         'end': line_start + len(current_line),
                         'is_list_item': True,
-                        'indent': indent
+                        'indent': indent,
+                        'indent_length': indent_length
                     })
                     current_position += len(current_line)
             else:
@@ -707,10 +718,10 @@ class ImageGenerator:
                         'start': line_start,
                         'end': current_position
                     })
-            
-            # 处理段落结束
-            if i < len(paragraphs) - 1:
-                current_position += 1
+        
+        # 处理段落结束
+        if i < len(paragraphs) - 1:
+            current_position += 1
         
         print("\n处理结果:")
         for i, line in enumerate(wrapped_info):
@@ -735,14 +746,22 @@ class ImageGenerator:
             font_size = item.get('font_size', 48 if item['type'] == 'title' else 32)
             line_spacing = item.get('line_spacing', 45)
             
+            print(f"\n渲染文本块:")
+            print(f"类型: {item['type']}")
+            print(f"字体大小: {font_size}")
+            print(f"行间距: {line_spacing}")
+            print(f"颜色信息: {colors}")
+            
             try:
                 current_font = ImageFont.truetype(font.path, font_size)
+                print(f"成功加载字体，大小: {font_size}")
             except Exception as e:
                 print(f"字体加载失败: {str(e)}")
                 continue
             
             # 获取换行后的文本
             wrapped_lines = item.get('wrapped_lines', [])
+            print(f"总行数: {len(wrapped_lines)}")
             
             # 渲染每一行
             for line_info in wrapped_lines:
@@ -750,16 +769,24 @@ class ImageGenerator:
                     current_y += line_spacing // 2
                     continue
                 
+                print(f"\n渲染行: '{line_info['text']}'")
+                print(f"行位置: {line_info['start']}-{line_info['end']}")
+                
                 # 计算行的起始位置
                 if item['type'] == 'title':
                     text_width = sum(current_font.getlength(char) for char in line_info['text'])
                     x = (self.width - text_width) // 2
+                    print(f"标题行，居中位置: {x}")
                 else:
                     x = self.margin
+                    indent_length = 0
                     if line_info.get('is_list_item'):
-                        # 使用缩进信息
                         indent = line_info.get('indent', '')
+                        indent_length = line_info.get('indent_length', 0)
                         x += current_font.getlength(indent)
+                        print(f"列表项，缩进长度: {indent_length}, 缩进后位置: {x}")
+                    else:
+                        print(f"普通行，左对齐位置: {x}")
                 
                 current_x = x
                 
@@ -767,18 +794,32 @@ class ImageGenerator:
                 text_start = line_info['start']
                 for i, char in enumerate(line_info['text']):
                     char_position = text_start + i
-                    char_color = 'black'
-                    
-                    # 查找当前字符的颜色
-                    for color_info in colors:
-                        if color_info['start'] <= char_position < color_info['end']:
-                            char_color = color_info['color']
-                            break
+                    if line_info.get('is_list_item'):
+                        # 对列表项，需要考虑缩进的影响
+                        actual_position = char_position - indent_length
+                        print(f"字符 '{char}' 原始位置: {char_position}, 调整后位置: {actual_position}")
+                        char_color = 'black'
+                        
+                        # 使用调整后的位置查找颜色
+                        for color_info in colors:
+                            if color_info['start'] <= actual_position < color_info['end']:
+                                char_color = color_info['color']
+                                print(f"字符 '{char}' 使用颜色: {char_color}")
+                                break
+                    else:
+                        # 非列表项正常处理
+                        char_color = 'black'
+                        for color_info in colors:
+                            if color_info['start'] <= char_position < color_info['end']:
+                                char_color = color_info['color']
+                                print(f"字符 '{char}' 使用颜色: {char_color}")
+                                break
                     
                     draw.text((current_x, current_y), char, font=current_font, fill=char_color)
                     current_x += current_font.getlength(char)
                 
                 current_y += line_spacing
+                print(f"行渲染完成，Y坐标更新到: {current_y}")
         
         print("\n=== 文本渲染完成 ===")
     
@@ -801,7 +842,7 @@ class ImageGenerator:
         
         # 分行处理文本
         for i, char in enumerate(text):
-            if char == '\n':  # 处理行符
+            if char == '\n':  # 处理符
                 if current_line:
                     lines.append((current_line, current_width))
                     current_line = []
@@ -860,7 +901,7 @@ class ImageGenerator:
         # 绘制文字和其他样式
         for line_idx, (line_chars, line_width) in enumerate(lines):
             current_y = start_y + line_idx * line_height
-            current_x = x  # 重置到左边距
+            current_x = x  # 重置到边距
             
             # 收集每行的下划线信息
             underlines = []
@@ -964,7 +1005,7 @@ class ImageGenerator:
     
     def calculate_block_height(self, wrapped_lines, item):
         """
-        计算内容块的总高度
+        计算内容���的总高度
         
         参数:
             wrapped_lines (list): 含行信息的典列表
