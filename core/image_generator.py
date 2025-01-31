@@ -6,21 +6,26 @@ import sys
 import logging
 from datetime import datetime
 from core.logo_processor import LogoProcessor
+import unicodedata
 
 class ImageGenerator:
     """
     图片生成器类
     负责将文本内容转换为图片，支持标题、正文、列表等多种格式的渲染
     """
-    def __init__(self):
+    def __init__(self, emoji_scale=0.5):
         """
         初始化图片生成器
         设置基本参数、初始化日志系统和字体加载
+        
+        参数:
+            emoji_scale (float): emoji 表情的缩放系数，默认1.5
         """
         self.width = 1080        # 图片宽度
         self.height = 1440       # 图片高度 (3:4 比例)
         self.margin = 50         # 页面边距
         self.list_indent = 30    # 列表缩进
+        self.emoji_scale_factor = emoji_scale  # 添加 emoji 缩放系数
         self.logo_processor = LogoProcessor(self.width, self.height)
         
         # 设置日志和加载字体
@@ -72,14 +77,7 @@ class ImageGenerator:
         """
         加载字体文件
         - 支持打包后和开发环境的字体路径
-        - 加载默认字体文件 MSYH.TTF
-        
-        返回:
-            dict: 包含加载好的字体对象的字典
-        
-        异常:
-            - 记录字体加载失败的错误
-            - 返回空字典作为降级处理
+        - 加载默认字体文件和 emoji 字体
         """
         fonts = {}
         try:
@@ -91,25 +89,83 @@ class ImageGenerator:
             
             fonts_dir = os.path.join(base_path, 'resources', 'fonts')
             font_path = os.path.join(fonts_dir, 'MSYH.TTF')
-            # 加载手写字体（例如：SourceHanSerif-Regular.otf）
             handwritten_font_path = os.path.join(fonts_dir, 'ZhanKuKuaiLeTi2016XiuDingBan-1.ttf')
             
-            if not os.path.exists(font_path):
-                self.logger.error(f"Font file not found at: {font_path}")
-                raise FileNotFoundError(f"Font file not found: {font_path}")
-            if not os.path.exists(handwritten_font_path):
-                self.logger.error(f"Handwritten font file not found at: {handwritten_font_path}")
-                raise FileNotFoundError(f"Font file not found: {handwritten_font_path}")
-
-                
-            fonts['normal'] = ImageFont.truetype(font_path, 32)
-            fonts['handwritten'] = ImageFont.truetype(handwritten_font_path, 32)
-            self.logger.info("Fonts loaded successfully")
+            # 尝试多个 emoji 字体，按优先级排序
+            emoji_font_paths = [
+                os.path.join(fonts_dir, 'NotoColorEmoji.ttf'),
+                os.path.join(fonts_dir, 'Segoe UI Emoji.ttf'),  # Windows Emoji 字体
+                os.path.join('/System/Library/Fonts/Apple Color Emoji.ttc'),  # macOS Emoji 字体
+                '/usr/share/fonts/truetype/noto/NotoColorEmoji.ttf'  # Linux Emoji 字体
+            ]
+            
+            # 设置基础字体大小
+            base_size = 32
+            
+            # 加载基本字体
+            try:
+                fonts['normal'] = ImageFont.truetype(font_path, base_size)
+                self.logger.info("Normal font loaded successfully")
+                fonts['handwritten'] = ImageFont.truetype(handwritten_font_path, base_size)
+                self.logger.info("Handwritten font loaded successfully")
+            except Exception as e:
+                self.logger.error(f"Error loading basic fonts: {str(e)}")
+                raise
+            
+            # 尝试加载 emoji 字体
+            emoji_font = None
+            emoji_sizes = [32]  # emoji 字体的标准尺寸
+            
+            for emoji_path in emoji_font_paths:
+                if os.path.exists(emoji_path):
+                    # 尝试不同的字体大小
+                    for size in emoji_sizes:
+                        try:
+                            emoji_font = ImageFont.truetype(emoji_path, size)
+                            self.logger.info(f"Emoji font loaded successfully from: {emoji_path} with size {size}")
+                            break
+                        except Exception as e:
+                            self.logger.debug(f"Failed to load emoji font with size {size}: {str(e)}")
+                    if emoji_font is not None:
+                        break
+            
+            if emoji_font is None:
+                self.logger.warning("No emoji font could be loaded, falling back to normal font")
+                emoji_font = fonts['normal']
+            
+            fonts['emoji'] = emoji_font
+            
+            # 记录加载的字体信息
+            for font_name, font_obj in fonts.items():
+                self.logger.info(f"Loaded font {font_name}: size={font_obj.size}")
+            
             return fonts
+        
         except Exception as e:
             self.logger.error(f"Error loading fonts: {str(e)}")
-            return {}
-        
+            default_font = ImageFont.load_default()
+            return {
+                'normal': default_font,
+                'handwritten': default_font,
+                'emoji': default_font
+            }
+
+    def is_emoji(self, char):
+        """
+        检查字符是否是 emoji
+        """
+        try:
+            # 更全面的 emoji 检测
+            return (
+                unicodedata.category(char) in ['So', 'Sk', 'Sm'] or  # Symbol categories
+                '\u2600' <= char <= '\u27BF' or  # Miscellaneous Symbols
+                '\u2B50' <= char <= '\u2B55' or  # Miscellaneous Symbols and Arrows
+                '\u2700' <= char <= '\u27BF' or  # Dingbats
+                '\U0001F300' <= char <= '\U0001F9FF'  # Supplemental Symbols and Pictographs
+            )
+        except TypeError:
+            return False
+
     def create_images(self, text_content, background_path, font_style='normal'):
         """
         生成图片的主要方法
@@ -155,83 +211,89 @@ class ImageGenerator:
                     font_size = item.get('font_size', 48 if item['type'] == 'title' else 32)
                     
                     try:
-                        current_font = ImageFont.truetype(self.fonts[font_style].path, font_size)
+                        # 直接使用已加载的字体对象，而不是尝试重新加载
+                        if font_style not in self.fonts:
+                            self.logger.error(f"未找到字体样式: {font_style}")
+                            font_style = 'normal'  # 降级到默认字体
+                        
+                        current_font = self.fonts[font_style]
+                        
+                        # 如果内容已经预处理过，直接使用
+                        if 'wrapped_lines' in item:
+                            wrapped_lines = item['wrapped_lines']
+                        else:
+                            # 预处理文本换行
+                            max_width = self.width - (self.margin * 2)
+                            wrapped_lines = self.get_wrapped_text(item['text'], current_font, max_width)
+                        
+                        # 计算此内容块的高度
+                        block_height = self.calculate_block_height(wrapped_lines, item)
+                        
+                        # 检查是否需要新页面
+                        if current_y + block_height > self.height - self.margin:
+                            if not current_page_content:
+                                # 如果是第一个内容块且太大，需要强制分割
+                                self.logger.warning(f"内容块太大，需要分割: {block_height} > {self.height - current_y - self.margin}")
+                                
+                                # 修改这里：计算实际可用空间和每行实际高度
+                                available_height = self.height - current_y - self.margin
+                                line_spacing = item.get('line_spacing', 45)
+                                
+                                # 计算每种类型行的实际高度
+                                normal_line_height = line_spacing
+                                empty_line_height = line_spacing // 2
+                                
+                                # 计算可以放入的行数
+                                remaining_height = available_height
+                                max_lines = 0
+                                
+                                for line in wrapped_lines:
+                                    line_height = empty_line_height if not line.strip() else normal_line_height
+                                    if remaining_height >= line_height:
+                                        max_lines += 1
+                                        remaining_height -= line_height
+                                    else:
+                                        break
+                                
+                                self.logger.debug(f"可用高度: {available_height}, 计算得到可容纳行数: {max_lines}")
+                                
+                                if max_lines > 0:
+                                    # 分割内容
+                                    current_lines = wrapped_lines[:max_lines]
+                                    remaining_lines = wrapped_lines[max_lines:]
+                                    
+                                    # 创建分割后的内容块
+                                    current_item = dict(item)
+                                    current_item['wrapped_lines'] = current_lines
+                                    
+                                    remaining_item = dict(item)
+                                    remaining_item['wrapped_lines'] = remaining_lines
+                                    
+                                    # 计算实际高度以验证
+                                    current_height = self.calculate_block_height(current_lines, current_item)
+                                    self.logger.debug(f"分割后当前块实际高度: {current_height}")
+                                    
+                                    current_page_content.append(current_item)
+                                    remaining_content[0] = remaining_item
+                                    self.logger.debug(f"内容块分割完成: 当前页 {len(current_lines)} 行，剩余 {len(remaining_lines)} 行")
+                                else:
+                                    self.logger.error("页面空间不足，跳过当前内容块")
+                                    remaining_content.pop(0)
+                            break
+                        
+                        # 将预处理后的内容添加到当前页面
+                        processed_item = dict(item)
+                        processed_item['wrapped_lines'] = wrapped_lines
+                        current_page_content.append(processed_item)
+                        current_y += block_height
+                        
+                        # 从剩余内容中移除已处理的项
+                        remaining_content.pop(0)
+                    
                     except Exception as e:
-                        self.logger.error(f"字体加载失败: {str(e)}")
+                        self.logger.error(f"处理内容块时出错: {str(e)}")
                         remaining_content.pop(0)
                         continue
-                    
-                    # 如果内容已经预处理过，直接使用
-                    if 'wrapped_lines' in item:
-                        wrapped_lines = item['wrapped_lines']
-                    else:
-                        # 预处理文本换行
-                        max_width = self.width - (self.margin * 2)
-                        wrapped_lines = self.get_wrapped_text(item['text'], current_font, max_width)
-                    
-                    # 计算此内容块的高度
-                    block_height = self.calculate_block_height(wrapped_lines, item)
-                    
-                    # 检查是否需要新页面
-                    if current_y + block_height > self.height - self.margin:
-                        if not current_page_content:
-                            # 如果是第一个内容块且太大，需要强制分割
-                            self.logger.warning(f"内容块太大，需要分割: {block_height} > {self.height - current_y - self.margin}")
-                            
-                            # 修改这里：计算实际可用空间和每行实际高度
-                            available_height = self.height - current_y - self.margin
-                            line_spacing = item.get('line_spacing', 45)
-                            
-                            # 计算每种类型行的实际高度
-                            normal_line_height = line_spacing
-                            empty_line_height = line_spacing // 2
-                            
-                            # 计算可以放入的行数
-                            remaining_height = available_height
-                            max_lines = 0
-                            
-                            for line in wrapped_lines:
-                                line_height = empty_line_height if not line.strip() else normal_line_height
-                                if remaining_height >= line_height:
-                                    max_lines += 1
-                                    remaining_height -= line_height
-                                else:
-                                    break
-                            
-                            self.logger.debug(f"可用高度: {available_height}, 计算得到可容纳行数: {max_lines}")
-                            
-                            if max_lines > 0:
-                                # 分割内容
-                                current_lines = wrapped_lines[:max_lines]
-                                remaining_lines = wrapped_lines[max_lines:]
-                                
-                                # 创建分割后的内容块
-                                current_item = dict(item)
-                                current_item['wrapped_lines'] = current_lines
-                                
-                                remaining_item = dict(item)
-                                remaining_item['wrapped_lines'] = remaining_lines
-                                
-                                # 计算实际高度以验证
-                                current_height = self.calculate_block_height(current_lines, current_item)
-                                self.logger.debug(f"分割后当前块实际高度: {current_height}")
-                                
-                                current_page_content.append(current_item)
-                                remaining_content[0] = remaining_item
-                                self.logger.debug(f"内容块分割完成: 当前页 {len(current_lines)} 行，剩余 {len(remaining_lines)} 行")
-                            else:
-                                self.logger.error("页面空间不足，跳过当前内容块")
-                                remaining_content.pop(0)
-                        break
-                    
-                    # 将预处理后的内容添加到当前页面
-                    processed_item = dict(item)
-                    processed_item['wrapped_lines'] = wrapped_lines
-                    current_page_content.append(processed_item)
-                    current_y += block_height
-                    
-                    # 从剩余内容中移除已处理的项
-                    remaining_content.pop(0)
                 
                 # 渲染当前页面的内容
                 if current_page_content:
@@ -239,9 +301,7 @@ class ImageGenerator:
                     images.append(image)
                     self.logger.info(f"完成第 {len(images)} 页")
                 else:
-                    self.logger.warning("前页面没有内容可渲染")
-                    if remaining_content:
-                        remaining_content.pop(0)
+                    self.logger.warning("当前页面没有内容可渲染")
                 
                 # 添加Logo
                 try:
@@ -756,20 +816,7 @@ class ImageGenerator:
         return lines
     
     def render_text(self, draw, text_content, font):
-        """
-        渲染文本到图片
-        
-        参数:
-            draw: PIL的ImageDraw对象
-            text_content (list): 预处理后的文本内容列表
-            font: 字体对象
-            
-        功能:
-            - 处理标题和内容的不同渲染样式
-            - 支持文本居中和左对齐
-            - 处理行间距和段落间距
-            - 保持标题和内容的间距一致性
-        """
+        """渲染文本到图片"""
         current_y = self.margin
         last_item_type = None
         
@@ -777,42 +824,60 @@ class ImageGenerator:
             if not item.get('text'):
                 continue
             
-            # 使用预处理的换行结果
             lines = item['wrapped_lines']
             font_size = item.get('font_size', 48 if item['type'] == 'title' else 32)
             line_spacing = item.get('line_spacing', 45)
             
-            try:
-                current_font = ImageFont.truetype(font.path, font_size)
-            except Exception as e:
-                self.logger.error(f"字体加载失败: {str(e)}")
-                continue
-            
-            # 处理标题和内容块之间的间距
             if last_item_type == 'title' and item['type'] == 'content':
                 current_y += line_spacing // 2
             
-            # 渲染每一行
             for line in lines:
-                if not line.strip():  # 空白行
+                if not line.strip():
                     current_y += line_spacing // 2
                     continue
                 
                 # 计算行的位置
                 if item['type'] == 'title':
-                    text_width = sum(current_font.getlength(char) for char in line)
+                    text_width = sum(
+                        self.fonts['emoji'].getlength(char) * (font_size / self.fonts['emoji'].size) * self.emoji_scale_factor
+                        if self.is_emoji(char) else font.getlength(char)
+                        for char in line
+                    )
                     x = (self.width - text_width) // 2
                 else:
                     x = self.margin
                 
                 # 渲染文本
-                draw.text((x, current_y), line, font=current_font, fill='black')
+                current_x = x
+                for char in line:
+                    try:
+                        if self.is_emoji(char):
+                            current_font = self.fonts['emoji']
+                            # 计算缩放比例，加入调整系数
+                            scale = (font_size / current_font.size) * self.emoji_scale_factor
+                            # 计算 emoji 的偏移量，使其垂直居中对齐
+                            emoji_offset = (font.size - current_font.size * scale) // 2
+                            
+                            # 绘制 emoji
+                            draw.text((current_x, current_y + emoji_offset), char, 
+                                    font=current_font, fill='black', embedded_color=True)
+                            # 更新水平位置，考虑缩放
+                            current_x += current_font.getlength(char) * scale
+                        else:
+                            current_font = font
+                            draw.text((current_x, current_y), char, 
+                                    font=current_font, fill='black')
+                            current_x += current_font.getlength(char)
+                    except Exception as e:
+                        self.logger.error(f"Error rendering character '{char}': {str(e)}")
+                        continue
+                
                 current_y += line_spacing
             
             last_item_type = item['type']
     
     def draw_styled_text(self, draw, text, marks, x, y, font, char_spacing=0, line_spacing=20):
-        """绘制带样式的文本"""
+        """绘制带样式的文本，支持 emoji"""
         char_width = font.getlength("测")  # 使用一个汉字宽度作为参考
         space_width = font.getlength(" ")  # 获取空格的宽度
         line_height = font.size + line_spacing / 4  # 行高等于字体大小加行间距
@@ -889,37 +954,20 @@ class ImageGenerator:
         # 绘制文字和其他样式
         for line_idx, (line_chars, line_width) in enumerate(lines):
             current_y = start_y + line_idx * line_height
-            current_x = x  # 重置到左边距
-            
-            # 收集每行的下划线信息
-            underlines = []
-            current_underline = None
+            current_x = x
             
             for char_idx, (text_idx, char) in enumerate(line_chars):
-                # 计算每个字符的实际宽度
-                actual_width = font.getlength(char)
-                
-                # 检查下划线样式
-                for (start, end), style in marks.items():
-                    if style['type'] == 'underline' and start <= text_idx <= end:
-                        if current_underline is None:
-                            current_underline = {
-                                'start_x': current_x,
-                                'color': style.get('color', '#000000'),
-                                'width': style.get('width', 2),
-                                'offset': style.get('offset', 5)
-                            }
-                        current_underline['end_x'] = current_x + actual_width
-                        break
+                # 检查是否是 emoji
+                if any(unicodedata.category(c).startswith('So') for c in char):
+                    # 使用 emoji 字体
+                    current_font = self.fonts['emoji']
                 else:
-                    if current_underline is not None:
-                        underlines.append(current_underline)
-                        current_underline = None
+                    current_font = font
+                    
+                actual_width = current_font.getlength(char)
                 
-                # 绘制文字（包括空格）
-                draw.text((current_x, current_y), char, font=font, fill='black')
-                
-                # 更新 x 坐标，考虑字间距
+                # 绘制文字
+                draw.text((current_x, current_y), char, font=current_font, fill='black')
                 current_x += actual_width + char_spacing
             
             # 添加最后一个下划线
