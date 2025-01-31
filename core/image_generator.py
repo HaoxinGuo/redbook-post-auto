@@ -956,19 +956,43 @@ class ImageGenerator:
             current_y = start_y + line_idx * line_height
             current_x = x
             
+            # 收集每行的下划线信息
+            underlines = []
+            current_underline = None
+            
             for char_idx, (text_idx, char) in enumerate(line_chars):
-                # 检查是否是 emoji
-                if any(unicodedata.category(c).startswith('So') for c in char):
-                    # 使用 emoji 字体
-                    current_font = self.fonts['emoji']
+                # 检查下划线样式
+                for (start, end), style in marks.items():
+                    if style['type'] == 'underline' and start <= text_idx <= end:
+                        if current_underline is None:
+                            current_underline = {
+                                'start_x': current_x,
+                                'color': style.get('color', '#000000'),
+                                'width': style.get('width', 2),
+                                'offset': style.get('offset', 5)
+                            }
+                        current_underline['end_x'] = current_x + font.getlength(char)
+                        break
                 else:
-                    current_font = font
-                    
-                actual_width = current_font.getlength(char)
+                    if current_underline is not None:
+                        underlines.append(current_underline)
+                        current_underline = None
                 
-                # 绘制文字
-                draw.text((current_x, current_y), char, font=current_font, fill='black')
-                current_x += actual_width + char_spacing
+                # 检查是否是 emoji
+                if self.is_emoji(char):
+                    current_font = self.fonts['emoji']
+                    # 计算缩放比例
+                    scale = (font.size / current_font.size) * self.emoji_scale_factor
+                    # 计算 emoji 的偏移量
+                    emoji_offset = (font.size - current_font.size * scale) // 2
+                    # 绘制 emoji
+                    draw.text((current_x, current_y + emoji_offset), char, 
+                             font=current_font, fill='black', embedded_color=True)
+                    current_x += current_font.getlength(char) * scale
+                else:
+                    # 绘制普通文字
+                    draw.text((current_x, current_y), char, font=font, fill='black')
+                    current_x += font.getlength(char) + char_spacing
             
             # 添加最后一个下划线
             if current_underline is not None:
