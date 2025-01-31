@@ -11,6 +11,7 @@ __pycache__/
 build/
 develop-eggs/
 dist/
+resources/fonts/Apple Color Emoji.ttc
 log/
 release/
 downloads/
